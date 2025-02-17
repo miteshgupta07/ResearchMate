@@ -1,1 +1,6 @@
-streamlit==1.42.0
+streamlit
+langchain_community
+langchain_core
+langchain_groq
+langchain
+python-dotenv
