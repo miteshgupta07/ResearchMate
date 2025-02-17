@@ -1,16 +1,15 @@
 import streamlit as st
 
-# App title
-st.title("🔍 Research Mate")
-st.subheader("Your AI-powered Research Assistant")
+rag_page=st.Page(page="views/rag.py",
+                 title="Chat",
+                 icon=":material/chat:",
+                 default=True)
 
-# Introduction
-st.write("Search for research papers and get AI-generated summaries and insights.")
+about_me=st.Page(page="views/about_developer.py",
+                 title="About Developer",
+                 icon=":material/person:")
 
-# Search Box
-query = st.text_input("Enter a research topic or question:", "")
 
-# Search Button
-if st.button("Search"):
-    st.write(f"🔎 Searching for: **{query}**")
-    # Placeholder for search functionality
+pg=st.navigation(pages=[rag_page,about_me])
+
+pg.run()
