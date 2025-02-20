@@ -4,3 +4,9 @@ langchain_core
 langchain_groq
 langchain
 python-dotenv
+pypdf2
+python-docx
+sentence-transformers
+chardet
+pymupdf
+docx2txt
