@@ -10,8 +10,9 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain import hub
-from langchain.agents import AgentExecutor, create_react_agent, load_tools
-
+from langchain.agents.agent import AgentExecutor
+from langchain.agents.react.agent import create_react_agent
+from langchain_community.agent_toolkits.load_tools import load_tools
 # Load environment variables
 load_dotenv()
 
@@ -21,6 +22,7 @@ os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 
 # Model dictionary mapping for API calls
 model_dict = {
+    "DeepSeek":"deepseek-r1-distill-llama-70b-specdec",
     "LLaMA 3.1-8B": "llama-3.1-8b-instant",
     "Gemma2 9B": "gemma2-9b-it",
     "Mixtral": "mixtral-8x7b-32768",
@@ -38,7 +40,7 @@ with st.sidebar:
     with st.expander("**Model Customization**", icon="🛠️"):
         model_type = st.selectbox(
             "**Choose model type**",
-            ["LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
+            ["DeepSeek","LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
         )
         st.session_state["model"] = model_type
 
@@ -52,7 +54,7 @@ with st.sidebar:
             "**Max Tokens**",
             1,
             2048,
-            256,
+            512,
         )
 
 # Greetings based on language selection
@@ -86,7 +88,7 @@ neutral_prompt = ChatPromptTemplate.from_template(
     "Maintain the conversation context based on the provided messages and respond appropriately."
 )
 agent = create_react_agent(model, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True,early_stopping_method="force", max_iterations=5)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True,early_stopping_method="force", max_iterations=3)
 
 # Initialize chat history if not present
 if "chat_history" not in st.session_state:
@@ -124,14 +126,14 @@ if user_input:
             "language": st.session_state.language,
             "messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.messages],
         },
-        config={"configurable": {"session_id": "default_session"}},
+        config={"configurable": {"session_id": "default_agent_session"}},
     )
 
-    response = agent_executor.invoke({"input": intermediate_response.content})
+    response = agent_executor.invoke({"input": user_input})
 
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.session_state.messages.append({"role": "assistant", "content": response['output']})
     with st.chat_message("assistant"):
-        st.write(response)
+        st.write(response['output'])
     
 else:
     with st.chat_message("assistant"): 
