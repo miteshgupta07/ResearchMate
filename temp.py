@@ -1,103 +1,51 @@
 import streamlit as st
-from langchain_core.documents import Document
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.chains.combine_documents.stuff import create_stuff_documents_chain
-import os
 from langchain_groq import ChatGroq
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_community.vectorstores import FAISS
-from langchain_core.output_parsers.string import StrOutputParser
+from langchain_community.utilities import ArxivAPIWrapper,WikipediaAPIWrapper
+from langchain_community.tools import ArxivQueryRun,WikipediaQueryRun,DuckDuckGoSearchRun
+from langchain.agents import initialize_agent,AgentType
+from langchain.callbacks import StreamlitCallbackHandler
+import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
-os.environ['LANGCHAIN_TRACING_V2'] = 'true'
+## Arxiv and wikipedia Tools
+arxiv_wrapper=ArxivAPIWrapper(top_k_results=1, doc_content_chars_max=200)
+arxiv=ArxivQueryRun(api_wrapper=arxiv_wrapper)
 
-# Initialize Streamlit App
-st.title("🧠 Simple RAG Application")
-st.subheader("Upload a PDF document and ask questions!")
+api_wrapper=WikipediaAPIWrapper(top_k_results=1,doc_content_chars_max=200)
+wiki=WikipediaQueryRun(api_wrapper=api_wrapper)
 
-# File upload
-uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
+search=DuckDuckGoSearchRun(name="Search")
 
-# Initialize session state for retriever
-if "retriever" not in st.session_state:
-    st.session_state.retriever = None
 
-# Process the uploaded document (Only when a new file is uploaded)
-if uploaded_file:
-    if "uploaded_file" not in st.session_state or st.session_state.uploaded_file != uploaded_file:
-        st.session_state.uploaded_file = uploaded_file
-        with st.spinner("Processing document..."):
-            # Save the uploaded file temporarily
-            with open("uploaded_document.pdf", "wb") as f:
-                f.write(st.session_state.uploaded_file.read())
+st.title("🔎 LangChain - Chat with search")
+"""
+In this example, we're using `StreamlitCallbackHandler` to display the thoughts and actions of an agent in an interactive Streamlit app.
+Try more LangChain 🤝 Streamlit Agent examples at [github.com/langchain-ai/streamlit-agent](https://github.com/langchain-ai/streamlit-agent).
+"""
 
-            # Load the document
-            loader = PyMuPDFLoader("uploaded_document.pdf")
-            documents = loader.load()
-
-            # Split text into chunks
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-            docs = text_splitter.split_documents(documents)
-
-            # Embeddings and FAISS Vector Store
-            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-            db = FAISS.from_documents(docs, embeddings)
-            st.session_state.retriever = db.as_retriever()
-
-            st.success("Document processed successfully!")
-
-# Initialize the language model
-model = ChatGroq(
-    model="llama-3.1-8b-instant",
-    api_key=os.getenv("GROQ_API_KEY"),
-    streaming=False
-)
-
-# Define the prompt template
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", "You are a helpful assistant developed by Mitesh. Use the provided context to answer accurately."),
-        ("human", "Context: {context}"),
-        MessagesPlaceholder(variable_name="messages"),
+## Sidebar for settings
+st.sidebar.title("Settings")
+if "messages" not in st.session_state:
+    st.session_state["messages"]=[
+        {"role":"assistant","content":"Hi,I'm a chatbot who can search the web. How can I help you?"}
     ]
-)
 
-# Create the chain with the model and prompt
-chain = create_stuff_documents_chain(llm=model, prompt=prompt, output_parser=StrOutputParser())
+for msg in st.session_state.messages:
+    st.chat_message(msg["role"]).write(msg['content'])
 
-# User input for question
-query = st.text_input("Ask a question about the document:")
+prompt=st.chat_input(placeholder="What is machine learning?")
+if prompt:
+    st.session_state.messages.append({"role":"user","content":prompt})
+    st.chat_message("user").write(prompt)
 
-# Generate response
-if query:
-    # If document is uploaded, use retrieval-augmented generation
-    if st.session_state.retriever:
-        # Retrieve relevant context
-        context = st.session_state.retriever.get_relevant_documents(query)
-        
-        # Generate and display the response
-        with st.spinner("Generating answer..."):
-            response = chain.invoke({"context": context, "messages": [{"role": "user", "content": query}]})
-            st.write(response)
+    llm=ChatGroq(api_key=os.getenv("GROQ_API_KEY"),model_name="Llama3-8b-8192",streaming=True)
+    tools=[search,arxiv,wiki]
 
-    # If no document is uploaded, handle as a general query
-    else:
-        no_doc_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", "You are a helpful assistant developed by Mitesh. Give appropriate answer."),
-                MessagesPlaceholder(variable_name="messages"),
-            ]
-        )
-        
-        # Simple Q&A without document context
-        chain = no_doc_prompt | model | StrOutputParser()
-        
-        with st.spinner("Generating answer..."):
-            response = chain.invoke({"messages": [{"role": "user", "content": query}]})
-            st.write(response)
+    search_agent=initialize_agent(tools,llm,agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,handling_parsing_errors=True)
+
+    with st.chat_message("assistant"):
+        # st_cb=StreamlitCallbackHandler(st.container(),expand_new_thoughts=False)
+        response=search_agent.run(st.session_state.messages)
+        st.session_state.messages.append({'role':'assistant',"content":response})
+        st.write(response)
+

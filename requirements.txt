@@ -10,3 +10,4 @@ sentence-transformers
 chardet
 pymupdf
 docx2txt
+arxiv == 2.1.3
