@@ -17,6 +17,7 @@ from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.output_parsers.string import StrOutputParser
@@ -73,7 +74,7 @@ with st.sidebar:
             "**Max Tokens**",
             1,
             2048,
-            256,
+            512,
             help="Controls the maximum number of tokens the model can generate in its response. Higher values allow for longer responses.",
         )
 
@@ -147,14 +148,14 @@ def get_chat_history(session_id: str) -> BaseChatMessageHistory:
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", "You are a research-focused assistant developed by Mitesh. Provide detailed, evidence-based responses and reference credible sources when possible."),
+        ("system", "You are a research-focused assistant. Provide detailed, evidence-based responses and reference credible sources when possible."),
         MessagesPlaceholder(variable_name="messages"),
     ]
 )
 
 rag_prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", "You are a research assistant developed by Mitesh. Utilize the provided context to deliver accurate, well-researched, and evidence-backed responses. Ensure responses are aligned with academic and research standards."),
+        ("system", "You are a research assistant. Utilize the provided context to deliver accurate, well-researched, and evidence-backed responses. Ensure responses are aligned with academic and research standards."),
         ("human", "Context: {context}"),
         MessagesPlaceholder(variable_name="messages"),
     ]
