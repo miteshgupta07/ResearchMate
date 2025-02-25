@@ -1,13 +1,13 @@
-streamlit
-langchain_community
-langchain_core
-langchain_groq
-langchain
-python-dotenv
-pypdf2
-python-docx
-sentence-transformers
-chardet
-pymupdf
-docx2txt
-arxiv == 2.1.3
+streamlit==1.42.0
+langchain_community==0.3.17
+langchain_core==0.3.35
+langchain_groq==0.2.4
+langchain==0.3.18
+python-dotenv==1.0.1
+pypdf2==3.0.1
+python-docx==1.1.2
+sentence-transformers==3.4.1
+chardet==5.2.0
+pymupdf==1.25.3
+docx2txt==0.8
+arxiv==2.1.3
