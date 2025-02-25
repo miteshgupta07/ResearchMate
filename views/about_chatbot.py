@@ -7,7 +7,7 @@ st.title("About ResearchMate 🤖")
 st.header("🌟 Introduction")
 st.write("""
 ResearchMate is a free AI research assistant developed by Mitesh Gupta, designed to assist users with academic and research queries. 
-It leverages advanced AI models and agent-based architectures to provide accurate and well-researched responses.
+It uses state-of-art advanced AI models and agent-based architectures to provide accurate and well-researched responses.
 With features like real-time retrieval from arXiv and the ability to query uploaded research papers, ResearchMate is a powerful tool for researchers and students alike.
 """)
 
