@@ -3,6 +3,7 @@ langchain_community==0.3.17
 langchain_core==0.3.35
 langchain_groq==0.2.4
 langchain==0.3.18
+langchain-huggingface==0.1.2
 python-dotenv==1.0.1
 pypdf2==3.0.1
 python-docx==1.1.2
