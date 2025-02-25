@@ -22,7 +22,7 @@ os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 
 # Model dictionary mapping for API calls
 model_dict = {
-    "DeepSeek":"deepseek-r1-distill-qwen-32b",
+    "DeepSeek":"llama-3.1-8b-instant",
     "LLaMA 3.1-8B": "llama-3.1-8b-instant",
     "Gemma2 9B": "gemma2-9b-it",
     "Mixtral": "mixtral-8x7b-32768",
