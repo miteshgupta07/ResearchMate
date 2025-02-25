@@ -29,7 +29,7 @@ os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 
 # Defining a dictionary to map model names to their identifiers for API calls
 model_dict = {
-    "DeepSeek":"deepseek-r1-distill-qwen-32b",
+    "DeepSeek r1":"deepseek-r1-distill-qwen-32b",
     "LLaMA 3.1-8B": "llama-3.1-8b-instant",
     "Gemma2 9B": "gemma2-9b-it",
     "Mixtral": "mixtral-8x7b-32768",
@@ -50,11 +50,11 @@ with st.sidebar:
         # Allowing the user to select the model type for generating responses
         model_type = st.selectbox(
             "**Choose model type**",
-            ["DeepSeek","LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
+            ["DeepSeek r1","LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
             help="Select the model type you want to use for generating responses. Each model has different strengths and use cases.",
         )
         model_desc = {
-            "DeepSeek":"DeepSeek is a research-oriented language model developed by Langchain, designed to provide detailed, evidence-based responses to academic and research queries. It excels in generating accurate and well-researched content, making it ideal for research-related tasks.",
+            "DeepSeek r1":"DeepSeek's initial large language model, known for its robust research-oriented capabilities and strong performance in coding and multilingual reasoning tasks.",
             "LLaMA 3.1-8B": "LLaMA (Large Language Model Meta AI) 3.1-8B is a versatile language model developed by Meta, featuring 8 billion parameters. It excels in a variety of natural language processing tasks such as text generation, summarization, and translation, while maintaining efficiency and reliability in performance.",
             "Gemma2 9B": "Gemma2 is a large-scale language model with 9 billion parameters, known for its ability to generate highly coherent, contextually accurate, and nuanced text. It is suited for applications that require creative content generation, such as dialogue systems, storytelling, and more.",
             "Mixtral": "Mixtral is a multi-modal AI model optimized for both text and image processing. This model integrates visual and textual information to enable tasks like image captioning, text-to-image generation, and interactive storytelling, offering a creative approach to AI applications."

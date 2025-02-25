@@ -1,54 +1,54 @@
 import streamlit as st
 
 # Setting the title for the page
-st.title("About the Chatbot 🤖")
+st.title("About ResearchMate 🤖")
 
 # Introduction Section
 st.header("🌟 Introduction")
 st.write("""
-This chatbot is a powerful tool designed to assist users with general queries. 
-It uses state-of-the-art conversational AI models to provide accurate and context-aware responses.
-The chatbot is equipped with a persistent history feature to maintain the flow of the conversation and ensure a seamless user experience. 
-Additionally, the chatbot supports multiple languages, allowing users from diverse backgrounds to interact effortlessly.
+ResearchMate is a free AI research assistant developed by Mitesh Gupta, designed to assist users with academic and research queries. 
+It leverages advanced AI models and agent-based architectures to provide accurate and well-researched responses.
+With features like real-time retrieval from arXiv and the ability to query uploaded research papers, ResearchMate is a powerful tool for researchers and students alike.
 """)
 
 # Purpose Section
 st.header("🎯 Purpose")
 st.write("""
-The main purpose of this chatbot is to:
-- Offer a conversational interface for interacting with advanced language models.
-- Enable users to ask questions in their preferred language.
-- Provide a platform for exploring the capabilities of cutting-edge AI models in a user-friendly manner.
+The main purposes of ResearchMate are to:
+- Provide a conversational interface for interacting with AI-driven research tools.
+- Enable users to upload research papers and ask queries directly.
+- Utilize AI agents for real-time retrieval of academic papers from arXiv.
+- Enhance research productivity by delivering precise and contextual insights.
 """)
 
 # Technologies Used Section
 st.header("⚙️ Technologies Used")
 st.write("""
-The chatbot is built using the following technologies:
-- **Streamlit**: To create a simple yet interactive user interface.
-- **ChatGroq**: For utilizing advanced conversational AI models.
-- **LangChain**: For managing chat history and prompt templates.
-- **Python**: As the backbone programming language for logic and integrations.
-- **Groq Models**: To deliver precise, creative, and contextually relevant responses.
+ResearchMate is built using the following technologies:
+- **Streamlit**: To create an interactive and user-friendly interface.
+- **LangChain**: For managing chat history, prompt templates, and agent-based architectures.
+- **FAISS**: For efficient vector-based search and retrieval.
+- **Python**: As the primary programming language for backend logic.
+- **arXiv API**: For real-time access to academic papers.
 """)
 
 # Features Section
 st.header("🔑 Key Features")
 st.markdown("""
-- **Multi-Model Support**: Choose from different models (e.g., LLaMA, Gemma2, Mixtral).
-- **Adjustable Parameters**: Fine-tune the chatbot's behavior by customizing temperature and max tokens.
-- **Persistent Chat History**: Maintain the context of the conversation across queries.
-- **Multilingual Support**: Communicate in languages like English, Hindi, Spanish, French, and German. 🌐
+- **Research Paper Querying**: Upload a paper and ask specific questions.
+- **AI Agent for Real-Time Retrieval**: Fetch relevant research papers from arXiv.
+- **Persistent Chat History**: Maintain the context of academic queries.
+- **Multilingual Support**: Communicate in various languages, enhancing accessibility. 🌐
 """)
 
 # Benefits Section
 st.header("💡 Benefits")
 st.write("""
-This chatbot provides:
-- Easy interaction with sophisticated AI systems.
-- Multilingual capabilities to make the chatbot accessible to a global audience.
-- A user-friendly interface for both general queries and specific use cases.
+ResearchMate provides:
+- Enhanced productivity for researchers and students.
+- A streamlined interface for accessing and querying research materials.
+- Real-time insights and academic support through AI-driven tools.
 """)
 
 # Closing Section
-st.markdown("#### **This chatbot is continually evolving to provide enhanced features and better support for its users. Explore its capabilities and enjoy the experience!** 🌱")
+st.markdown("#### **ResearchMate is continually evolving to provide enhanced features and better support for its users. Explore its capabilities and accelerate your research journey!** 🌱")
