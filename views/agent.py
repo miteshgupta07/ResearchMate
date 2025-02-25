@@ -22,7 +22,7 @@ os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 
 # Model dictionary mapping for API calls
 model_dict = {
-    "DeepSeek":"deepseek-r1-distill-llama-70b-specdec",
+    "DeepSeek":"deepseek-r1-distill-qwen-32b",
     "LLaMA 3.1-8B": "llama-3.1-8b-instant",
     "Gemma2 9B": "gemma2-9b-it",
     "Mixtral": "mixtral-8x7b-32768",
@@ -85,23 +85,23 @@ st.write("Your research-oriented assistant developed by Mitesh😎, ready to ass
 tools = load_tools(["arxiv"])
 prompt = hub.pull("hwchase17/react")
 neutral_prompt = ChatPromptTemplate.from_template(
-    "Maintain the conversation context based on the provided messages and respond appropriately."
+    "Maintain the conversation context based on the provided agent_messages and respond appropriately."
 )
 agent = create_react_agent(model, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True,early_stopping_method="force", max_iterations=3)
 
 # Initialize chat history if not present
-if "chat_history" not in st.session_state:
-    st.session_state["chat_history"] = ChatMessageHistory()
+if "agent_chat_history" not in st.session_state:
+    st.session_state["agent_chat_history"] = ChatMessageHistory()
 
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+if "agent_messages" not in st.session_state:
+    st.session_state["agent_messages"] = []
 
 def get_chat_history(session_id: str) -> BaseChatMessageHistory:
-    return st.session_state["chat_history"]
+    return st.session_state["agent_chat_history"]
 
-# Display previous chat messages
-for msg in st.session_state["messages"]:
+# Display previous chat agent_messages
+for msg in st.session_state["agent_messages"]:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
@@ -109,7 +109,7 @@ for msg in st.session_state["messages"]:
 user_input = st.chat_input("Ask a question...")
 
 if user_input:
-    st.session_state["messages"].append({"role": "user", "content": user_input})
+    st.session_state["agent_messages"].append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.write(user_input)
 
@@ -118,20 +118,20 @@ if user_input:
     with_message_history = RunnableWithMessageHistory(
         chain,
         get_chat_history,
-        input_messages_key="messages",
+        input_messages_key="agent_messages",
     )
 
     intermediate_response = with_message_history.invoke(
         {
             "language": st.session_state.language,
-            "messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.messages],
+            "agent_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.agent_messages],
         },
         config={"configurable": {"session_id": "default_agent_session"}},
     )
 
     response = agent_executor.invoke({"input": user_input})
 
-    st.session_state.messages.append({"role": "assistant", "content": response['output']})
+    st.session_state.agent_messages.append({"role": "assistant", "content": response['output']})
     with st.chat_message("assistant"):
         st.write(response['output'])
     

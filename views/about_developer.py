@@ -10,14 +10,27 @@ Hello there! I'm Mitesh Gupta, a passionate Machine Learning enthusiast and deve
 I love building innovative AI solutions and exploring the latest advancements in deep learning, generative AI, and NLP.
 Feel free to connect and explore my projects!
 """)
+col1,col2,col3 =st.columns([0.18,0.05,0.4], border=False,vertical_alignment="center")
+with col1:
+    st.link_button("Visit my portfolio here","https://miteshgupta-portfolio.vercel.app/")
 
+with col2:
+    st.write("**Or**")
+with col3:
+    st.download_button(
+        label="Download My Resume",
+        data="https://drive.google.com/file/d/1LKDQ5XjscIuGzvulEFBiBigT2f0U5k0R/view?usp=sharing",
+        file_name="Mitesh_Gupta_Resume.pdf",
+        mime="application/pdf",
+    )
 # Skills Section
 st.header("🚀 Skills")
 st.markdown("""
 - **Programming Languages**: Python
 - **AI/ML Frameworks**: TensorFlow, PyTorch, LangChain
 - **Tools**: Streamlit, Hugging Face, OpenAI APIs
-- **Other Skills**: Data Science, Deep Learning, NLP, Generative AI, RAG Systems
+- **Databases**: MySQL, FAISS, ChromaDB
+- **Other Skills**: Data Science, Machine Learning, Deep Learning, NLP, Generative AI, RAG Systems
 """)
 
 # Interests Section

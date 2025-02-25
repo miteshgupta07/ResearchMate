@@ -29,7 +29,7 @@ os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 
 # Defining a dictionary to map model names to their identifiers for API calls
 model_dict = {
-    "DeepSeek r1":"deepseek-r1-distill-qwen-32b",
+    "DeepSeek r1":"llama-3.1-8b-instant",
     "LLaMA 3.1-8B": "llama-3.1-8b-instant",
     "Gemma2 9B": "gemma2-9b-it",
     "Mixtral": "mixtral-8x7b-32768",
@@ -99,6 +99,7 @@ model = ChatGroq(
     temperature=temperature,
     max_tokens=max_tokens,
     streaming=True,
+    verbose=False
 )
 
 # Setting up the main Streamlit interface and initializing the chatbot UI
@@ -136,22 +137,22 @@ if uploaded_file:
             st.success("Document processed successfully!")
 
 
-# Initializing session state variables for chat history and user-assistant messages
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = ChatMessageHistory()  # Manages message history within the session
+# Initializing session state variables for chat history and user-assistant rag_messages
+if "rag_chat_history" not in st.session_state:
+    st.session_state.rag_chat_history = ChatMessageHistory()  # Manages message history within the session
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "rag_messages" not in st.session_state:
+    st.session_state.rag_messages = []
 
 # Function to retrieve session-specific chat history for maintaining conversation context
 def get_chat_history(session_id: str) -> BaseChatMessageHistory:
-    return st.session_state.chat_history  # Returns the chat history for the current session
+    return st.session_state.rag_chat_history  # Returns the chat history for the current session
 
 
 prompt = ChatPromptTemplate.from_messages(
     [
         ("system", "You are a research-focused assistant. Provide detailed, evidence-based responses and reference credible sources when possible."),
-        MessagesPlaceholder(variable_name="messages"),
+        MessagesPlaceholder(variable_name="rag_messages"),
     ]
 )
 
@@ -159,13 +160,13 @@ rag_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", "You are a research assistant. Utilize the provided context to deliver accurate, well-researched, and evidence-backed responses. Ensure responses are aligned with academic and research standards."),
         ("human", "Context: {context}"),
-        MessagesPlaceholder(variable_name="messages"),
+        MessagesPlaceholder(variable_name="rag_messages"),
     ]
 )
 
 
 # Displaying chat history to provide a consistent user experience
-for msg in st.session_state.messages:
+for msg in st.session_state.rag_messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
@@ -173,7 +174,7 @@ for msg in st.session_state.messages:
 user_input = st.chat_input("Ask a question:")
 if user_input:
     # Storing the user's input in session state and displaying it in the chat
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.session_state.rag_messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.write(user_input)
 
@@ -183,16 +184,18 @@ if user_input:
         with_message_history = RunnableWithMessageHistory(
             chain,
             get_chat_history,  # Function to fetch chat history
-            input_messages_key="messages",  # Key to access the messages
+            input_messages_key="rag_messages",  # Key to access the rag_messages
         )
     # Generating the assistant's response based on the chat history and input
         response = with_message_history.invoke(
             {"context":context,
              "language": st.session_state.language,
-            "messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.messages]},
+            "rag_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.rag_messages]},
             config={"configurable": {"session_id": "default_rag_session"}},
         )
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        print(response)
+        st.session_state.rag_messages.append({"role": "assistant", "content": response})
+        
         with st.chat_message("assistant"):
             st.write(response)
 
@@ -201,14 +204,16 @@ if user_input:
         with_message_history = RunnableWithMessageHistory(
             chain,
             get_chat_history,  # Function to fetch chat history
-            input_messages_key="messages",  # Key to access the messages
+            input_messages_key="rag_messages",  # Key to access the rag_messages
         )
         response = with_message_history.invoke(
             {"language": st.session_state.language,
-            "messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.messages]},
+            "rag_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.rag_messages]},
             config={"configurable": {"session_id": "default_session"}},
         )
-        st.session_state.messages.append({"role": "assistant", "content": response.content})
+        print(response)
+        st.session_state.rag_messages.append({"role": "assistant", "content": response.content})
+        
         with st.chat_message("assistant"):
             st.write(response.content)
 
