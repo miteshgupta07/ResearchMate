@@ -1,10 +1,10 @@
-streamlit==1.42.0
-langchain_community==0.3.17
-langchain_core==0.3.35
-langchain_groq==0.2.4
-langchain==0.3.18
+streamlit==1.44.1
+langchain_community==0.3.21
+langchain_core==0.3.54
+langchain_groq==0.3.2
+langchain==0.3.23
 langchain-huggingface==0.1.2
-python-dotenv==1.0.1
+python-dotenv==1.1.0
 pypdf2==3.0.1
 python-docx==1.1.2
 sentence-transformers==3.4.1
