@@ -193,7 +193,7 @@ if user_input:
             "rag_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.rag_messages]},
             config={"configurable": {"session_id": "default_rag_session"}},
         )
-        print(response)
+        # print(response)
         st.session_state.rag_messages.append({"role": "assistant", "content": response})
         
         with st.chat_message("assistant"):
