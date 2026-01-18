@@ -1,27 +1,30 @@
 # Importing modules required for the chatbot functionality, including model setup, history management, and Streamlit UI
+import os
+
+from dotenv import load_dotenv
+
 import streamlit as st
+
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+
 from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_groq import ChatGroq
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-import os
-from dotenv import load_dotenv
-load_dotenv()
-import streamlit as st
-from langchain_core.documents import Document
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.chains.combine_documents.stuff import create_stuff_documents_chain
-import os
-from langchain_groq import ChatGroq
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyMuPDFLoader
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.documents import Document
 from langchain_core.output_parsers.string import StrOutputParser
-from dotenv import load_dotenv
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+from langchain_groq import ChatGroq
+
+from langchain_huggingface import HuggingFaceEmbeddings
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+load_dotenv()
 
 # Setting Up Langchain Tracing
 os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
@@ -179,7 +182,7 @@ if user_input:
         st.write(user_input)
 
     if st.session_state.retriever:
-        context = st.session_state.retriever.get_relevant_documents(user_input)
+        context = st.session_state.retriever.invoke(user_input)
         chain=create_stuff_documents_chain(llm=model, prompt=rag_prompt)
         with_message_history = RunnableWithMessageHistory(
             chain,
@@ -193,7 +196,6 @@ if user_input:
             "rag_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.rag_messages]},
             config={"configurable": {"session_id": "default_rag_session"}},
         )
-        # print(response)
         st.session_state.rag_messages.append({"role": "assistant", "content": response})
         
         with st.chat_message("assistant"):
@@ -211,7 +213,6 @@ if user_input:
             "rag_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.rag_messages]},
             config={"configurable": {"session_id": "default_session"}},
         )
-        print(response)
         st.session_state.rag_messages.append({"role": "assistant", "content": response.content})
         
         with st.chat_message("assistant"):
