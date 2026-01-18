@@ -7,16 +7,13 @@ import streamlit as st
 
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 
-from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
-from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.documents import Document
 from langchain_core.output_parsers.string import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables.history import RunnableWithMessageHistory
 
 from langchain_groq import ChatGroq
 
@@ -25,6 +22,52 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
+
+
+# Custom chat memory abstraction to replace LangChain memory management
+class ChatMessage:
+    """Represents a single chat message with role and content."""
+    def __init__(self, role: str, content: str):
+        self.role = role
+        self.content = content
+    
+    def to_dict(self):
+        """Convert to dictionary format for storage and display."""
+        return {"role": self.role, "content": self.content}
+    
+    def to_langchain_tuple(self):
+        """Convert to LangChain message format (role, content) tuple."""
+        if self.role == "user":
+            return ("human", self.content)
+        elif self.role == "assistant":
+            return ("ai", self.content)
+        else:
+            return (self.role, self.content)
+
+
+class ChatHistoryStore:
+    """Manages chat history backed by Streamlit session state."""
+    def __init__(self, session_key: str = "rag_messages"):
+        self.session_key = session_key
+        if self.session_key not in st.session_state:
+            st.session_state[self.session_key] = []
+    
+    def add_message(self, role: str, content: str):
+        """Add a new message to the chat history."""
+        message = ChatMessage(role, content)
+        st.session_state[self.session_key].append(message.to_dict())
+    
+    def get_messages(self):
+        """Get all messages in dictionary format."""
+        return st.session_state[self.session_key]
+    
+    def get_langchain_messages(self):
+        """Convert messages to LangChain format for prompt templates."""
+        return [ChatMessage(**msg).to_langchain_tuple() for msg in st.session_state[self.session_key]]
+    
+    def clear(self):
+        """Clear all messages from history."""
+        st.session_state[self.session_key] = []
 
 # Setting Up Langchain Tracing
 os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
@@ -140,16 +183,8 @@ if uploaded_file:
             st.success("Document processed successfully!")
 
 
-# Initializing session state variables for chat history and user-assistant rag_messages
-if "rag_chat_history" not in st.session_state:
-    st.session_state.rag_chat_history = ChatMessageHistory()  # Manages message history within the session
-
-if "rag_messages" not in st.session_state:
-    st.session_state.rag_messages = []
-
-# Function to retrieve session-specific chat history for maintaining conversation context
-def get_chat_history(session_id: str) -> BaseChatMessageHistory:
-    return st.session_state.rag_chat_history  # Returns the chat history for the current session
+# Initialize chat history store
+chat_history = ChatHistoryStore()
 
 
 prompt = ChatPromptTemplate.from_messages(
@@ -169,52 +204,47 @@ rag_prompt = ChatPromptTemplate.from_messages(
 
 
 # Displaying chat history to provide a consistent user experience
-for msg in st.session_state.rag_messages:
+for msg in chat_history.get_messages():
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
 # Capturing user input from the chat input box
 user_input = st.chat_input("Ask a question:")
 if user_input:
-    # Storing the user's input in session state and displaying it in the chat
-    st.session_state.rag_messages.append({"role": "user", "content": user_input})
+    # Storing the user's input in chat history and displaying it
+    chat_history.add_message("user", user_input)
     with st.chat_message("user"):
         st.write(user_input)
 
     if st.session_state.retriever:
+        # RAG mode: retrieve context and generate response
         context = st.session_state.retriever.invoke(user_input)
-        chain=create_stuff_documents_chain(llm=model, prompt=rag_prompt)
-        with_message_history = RunnableWithMessageHistory(
-            chain,
-            get_chat_history,  # Function to fetch chat history
-            input_messages_key="rag_messages",  # Key to access the rag_messages
-        )
-    # Generating the assistant's response based on the chat history and input
-        response = with_message_history.invoke(
-            {"context":context,
-             "language": st.session_state.language,
-            "rag_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.rag_messages]},
-            config={"configurable": {"session_id": "default_rag_session"}},
-        )
-        st.session_state.rag_messages.append({"role": "assistant", "content": response})
+        chain = create_stuff_documents_chain(llm=model, prompt=rag_prompt)
         
+        # Generate response with context and message history
+        response = chain.invoke({
+            "context": context,
+            "language": st.session_state.language,
+            "rag_messages": chat_history.get_langchain_messages()
+        })
+        
+        # Store and display assistant's response
+        chat_history.add_message("assistant", response)
         with st.chat_message("assistant"):
             st.write(response)
 
     else:
-        chain=prompt | model
-        with_message_history = RunnableWithMessageHistory(
-            chain,
-            get_chat_history,  # Function to fetch chat history
-            input_messages_key="rag_messages",  # Key to access the rag_messages
-        )
-        response = with_message_history.invoke(
-            {"language": st.session_state.language,
-            "rag_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.rag_messages]},
-            config={"configurable": {"session_id": "default_session"}},
-        )
-        st.session_state.rag_messages.append({"role": "assistant", "content": response.content})
+        # Normal chat mode: generate response without RAG context
+        chain = prompt | model
         
+        # Generate response with message history
+        response = chain.invoke({
+            "language": st.session_state.language,
+            "rag_messages": chat_history.get_langchain_messages()
+        })
+        
+        # Store and display assistant's response
+        chat_history.add_message("assistant", response.content)
         with st.chat_message("assistant"):
             st.write(response.content)
 
