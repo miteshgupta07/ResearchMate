@@ -8,14 +8,13 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_groq import ChatGroq
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain import hub
-from langchain.agents.agent import AgentExecutor
-from langchain.agents.react.agent import create_react_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langsmith import Client
+from langchain_classic.agents.agent import AgentExecutor
+from langchain_classic.agents.react.agent import create_react_agent
 from langchain_community.agent_toolkits.load_tools import load_tools
 # Load environment variables
 load_dotenv()
-
 # Setting Up Langchain Tracing
 os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
 os.environ['LANGCHAIN_TRACING_V2'] = 'true'
@@ -83,7 +82,8 @@ st.write("Your research-oriented assistant developed by Mitesh😎, ready to ass
 
 # Load tools and create agent
 tools = load_tools(["arxiv"])
-prompt = hub.pull("hwchase17/react")
+client = Client()
+prompt = client.pull_prompt("hwchase17/react")
 neutral_prompt = ChatPromptTemplate.from_template(
     "Maintain the conversation context based on the provided agent_messages and respond appropriately."
 )
