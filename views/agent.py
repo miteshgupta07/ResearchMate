@@ -4,17 +4,47 @@ import os
 from dotenv import load_dotenv
 
 # LangChain & AI Model Imports
-from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langsmith import Client
 from langchain_classic.agents.agent import AgentExecutor
 from langchain_classic.agents.react.agent import create_react_agent
 from langchain_community.agent_toolkits.load_tools import load_tools
+
 # Load environment variables
 load_dotenv()
+
+
+# Custom chat memory abstraction to replace LangChain memory management
+class ChatMessage:
+    """Represents a single chat message with role and content."""
+    def __init__(self, role: str, content: str):
+        self.role = role
+        self.content = content
+    
+    def to_dict(self):
+        """Convert to dictionary format for storage and display."""
+        return {"role": self.role, "content": self.content}
+
+
+class ChatHistoryStore:
+    """Manages chat history backed by Streamlit session state."""
+    def __init__(self, session_key: str = "agent_messages"):
+        self.session_key = session_key
+        if self.session_key not in st.session_state:
+            st.session_state[self.session_key] = []
+    
+    def add_message(self, role: str, content: str):
+        """Add a new message to the chat history."""
+        message = ChatMessage(role, content)
+        st.session_state[self.session_key].append(message.to_dict())
+    
+    def get_messages(self):
+        """Get all messages in dictionary format."""
+        return st.session_state[self.session_key]
+    
+    def clear(self):
+        """Clear all messages from history."""
+        st.session_state[self.session_key] = []
 # Setting Up Langchain Tracing
 os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
 os.environ['LANGCHAIN_TRACING_V2'] = 'true'
@@ -84,24 +114,14 @@ st.write("Your research-oriented assistant developed by Mitesh😎, ready to ass
 tools = load_tools(["arxiv"])
 client = Client()
 prompt = client.pull_prompt("hwchase17/react")
-neutral_prompt = ChatPromptTemplate.from_template(
-    "Maintain the conversation context based on the provided agent_messages and respond appropriately."
-)
 agent = create_react_agent(model, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True,early_stopping_method="force", max_iterations=3)
 
-# Initialize chat history if not present
-if "agent_chat_history" not in st.session_state:
-    st.session_state["agent_chat_history"] = ChatMessageHistory()
+# Initialize chat history store
+chat_history = ChatHistoryStore()
 
-if "agent_messages" not in st.session_state:
-    st.session_state["agent_messages"] = []
-
-def get_chat_history(session_id: str) -> BaseChatMessageHistory:
-    return st.session_state["agent_chat_history"]
-
-# Display previous chat agent_messages
-for msg in st.session_state["agent_messages"]:
+# Display previous chat messages
+for msg in chat_history.get_messages():
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
@@ -109,29 +129,13 @@ for msg in st.session_state["agent_messages"]:
 user_input = st.chat_input("Ask a question...")
 
 if user_input:
-    st.session_state["agent_messages"].append({"role": "user", "content": user_input})
+    chat_history.add_message("user", user_input)
     with st.chat_message("user"):
         st.write(user_input)
 
-    chain = neutral_prompt | model
-
-    with_message_history = RunnableWithMessageHistory(
-        chain,
-        get_chat_history,
-        input_messages_key="agent_messages",
-    )
-
-    intermediate_response = with_message_history.invoke(
-        {
-            "language": st.session_state.language,
-            "agent_messages": [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.agent_messages],
-        },
-        config={"configurable": {"session_id": "default_agent_session"}},
-    )
-
     response = agent_executor.invoke({"input": user_input})
 
-    st.session_state.agent_messages.append({"role": "assistant", "content": response['output']})
+    chat_history.add_message("assistant", response['output'])
     with st.chat_message("assistant"):
         st.write(response['output'])
     
