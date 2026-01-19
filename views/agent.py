@@ -45,6 +45,7 @@ class ChatHistoryStore:
     def clear(self):
         """Clear all messages from history."""
         st.session_state[self.session_key] = []
+        
 # Setting Up Langchain Tracing
 os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
 os.environ['LANGCHAIN_TRACING_V2'] = 'true'
