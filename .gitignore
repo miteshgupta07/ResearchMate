@@ -3,6 +3,7 @@ __pycache__/
 *.py[codz]
 *$py.class
 *.pdf
+data/
 # C extensions
 *.so
 Upgrade.md
