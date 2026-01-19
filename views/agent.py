@@ -10,41 +10,11 @@ from langchain_classic.agents.agent import AgentExecutor
 from langchain_classic.agents.react.agent import create_react_agent
 from langchain_community.agent_toolkits.load_tools import load_tools
 
+# Import unified chat history
+from core.chat_history import StreamlitSessionChatHistory
+
 # Load environment variables
 load_dotenv()
-
-
-# Custom chat memory abstraction to replace LangChain memory management
-class ChatMessage:
-    """Represents a single chat message with role and content."""
-    def __init__(self, role: str, content: str):
-        self.role = role
-        self.content = content
-    
-    def to_dict(self):
-        """Convert to dictionary format for storage and display."""
-        return {"role": self.role, "content": self.content}
-
-
-class ChatHistoryStore:
-    """Manages chat history backed by Streamlit session state."""
-    def __init__(self, session_key: str = "agent_messages"):
-        self.session_key = session_key
-        if self.session_key not in st.session_state:
-            st.session_state[self.session_key] = []
-    
-    def add_message(self, role: str, content: str):
-        """Add a new message to the chat history."""
-        message = ChatMessage(role, content)
-        st.session_state[self.session_key].append(message.to_dict())
-    
-    def get_messages(self):
-        """Get all messages in dictionary format."""
-        return st.session_state[self.session_key]
-    
-    def clear(self):
-        """Clear all messages from history."""
-        st.session_state[self.session_key] = []
         
 # Setting Up Langchain Tracing
 os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
@@ -119,7 +89,7 @@ agent = create_react_agent(model, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True,early_stopping_method="force", max_iterations=3)
 
 # Initialize chat history store
-chat_history = ChatHistoryStore()
+chat_history = StreamlitSessionChatHistory(session_key="agent_messages")
 
 # Display previous chat messages
 for msg in chat_history.get_messages():

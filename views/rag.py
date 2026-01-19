@@ -6,54 +6,9 @@ import streamlit as st
 # Import backend services and core logic
 from services.llm import create_llm
 from core.rag_pipeline import process_uploaded_pdf, answer_with_rag, answer_without_rag
+from core.chat_history import StreamlitSessionChatHistory
 
 load_dotenv()
-
-
-# Custom chat memory abstraction to replace LangChain memory management
-class ChatMessage:
-    """Represents a single chat message with role and content."""
-    def __init__(self, role: str, content: str):
-        self.role = role
-        self.content = content
-    
-    def to_dict(self):
-        """Convert to dictionary format for storage and display."""
-        return {"role": self.role, "content": self.content}
-    
-    def to_langchain_tuple(self):
-        """Convert to LangChain message format (role, content) tuple."""
-        if self.role == "user":
-            return ("human", self.content)
-        elif self.role == "assistant":
-            return ("ai", self.content)
-        else:
-            return (self.role, self.content)
-
-
-class ChatHistoryStore:
-    """Manages chat history backed by Streamlit session state."""
-    def __init__(self, session_key: str = "rag_messages"):
-        self.session_key = session_key
-        if self.session_key not in st.session_state:
-            st.session_state[self.session_key] = []
-    
-    def add_message(self, role: str, content: str):
-        """Add a new message to the chat history."""
-        message = ChatMessage(role, content)
-        st.session_state[self.session_key].append(message.to_dict())
-    
-    def get_messages(self):
-        """Get all messages in dictionary format."""
-        return st.session_state[self.session_key]
-    
-    def get_langchain_messages(self):
-        """Convert messages to LangChain format for prompt templates."""
-        return [ChatMessage(**msg).to_langchain_tuple() for msg in st.session_state[self.session_key]]
-    
-    def clear(self):
-        """Clear all messages from history."""
-        st.session_state[self.session_key] = []
 
 # Setting Up Langchain Tracing
 os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
@@ -152,7 +107,7 @@ if uploaded_file:
 
 
 # Initialize chat history store
-chat_history = ChatHistoryStore()
+chat_history = StreamlitSessionChatHistory(session_key="rag_messages")
 
 # Displaying chat history to provide a consistent user experience
 for msg in chat_history.get_messages():
