@@ -1,25 +1,11 @@
 # Importing modules required for the chatbot functionality, including model setup, history management, and Streamlit UI
 import os
-
 from dotenv import load_dotenv
-
 import streamlit as st
 
-from langchain_classic.chains.combine_documents import create_stuff_documents_chain
-
-from langchain_community.document_loaders import PyMuPDFLoader
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-
-from langchain_core.documents import Document
-from langchain_core.output_parsers.string import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
-from langchain_groq import ChatGroq
-
-from langchain_huggingface import HuggingFaceEmbeddings
-
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+# Import backend services and core logic
+from services.llm import create_llm
+from core.rag_pipeline import process_uploaded_pdf, answer_with_rag, answer_without_rag
 
 load_dotenv()
 
@@ -139,13 +125,10 @@ greetings = {
 selected_model = model_dict[st.session_state.model]
 
 # Initializing the language model with parameters and enabling streaming for real-time responses
-model = ChatGroq(
-    model=selected_model,
-    api_key=os.getenv("GROQ_API_KEY"),
+model = create_llm(
+    model_name=selected_model,
     temperature=temperature,
-    max_tokens=max_tokens,
-    streaming=True,
-    verbose=False
+    max_tokens=max_tokens
 )
 
 # Setting up the main Streamlit interface and initializing the chatbot UI
@@ -163,45 +146,13 @@ if uploaded_file:
     if "uploaded_file" not in st.session_state or st.session_state.uploaded_file != uploaded_file:
         st.session_state.uploaded_file = uploaded_file
         with st.spinner("Processing document..."):
-            # Save the uploaded file temporarily
-            with open("uploaded_document.pdf", "wb") as f:
-                f.write(st.session_state.uploaded_file.read())
-
-            # Load the document
-            loader = PyMuPDFLoader("uploaded_document.pdf")
-            documents = loader.load()
-
-            # Split text into chunks
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-            docs = text_splitter.split_documents(documents)
-
-            # Embeddings and FAISS Vector Store
-            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-            db = FAISS.from_documents(docs, embeddings)
-            st.session_state.retriever = db.as_retriever()
-
+            # Process PDF and create retriever using core RAG pipeline
+            st.session_state.retriever = process_uploaded_pdf(uploaded_file)
             st.success("Document processed successfully!")
 
 
 # Initialize chat history store
 chat_history = ChatHistoryStore()
-
-
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", "You are a research-focused assistant. Provide detailed, evidence-based responses and reference credible sources when possible."),
-        MessagesPlaceholder(variable_name="rag_messages"),
-    ]
-)
-
-rag_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", "You are a research assistant. Utilize the provided context to deliver accurate, well-researched, and evidence-backed responses. Ensure responses are aligned with academic and research standards."),
-        ("human", "Context: {context}"),
-        MessagesPlaceholder(variable_name="rag_messages"),
-    ]
-)
-
 
 # Displaying chat history to provide a consistent user experience
 for msg in chat_history.get_messages():
@@ -217,16 +168,14 @@ if user_input:
         st.write(user_input)
 
     if st.session_state.retriever:
-        # RAG mode: retrieve context and generate response
-        context = st.session_state.retriever.invoke(user_input)
-        chain = create_stuff_documents_chain(llm=model, prompt=rag_prompt)
-        
-        # Generate response with context and message history
-        response = chain.invoke({
-            "context": context,
-            "language": st.session_state.language,
-            "rag_messages": chat_history.get_langchain_messages()
-        })
+        # RAG mode: retrieve context and generate response using RAG pipeline
+        response = answer_with_rag(
+            llm=model,
+            retriever=st.session_state.retriever,
+            user_input=user_input,
+            chat_history_langchain=chat_history.get_langchain_messages(),
+            language=st.session_state.language
+        )
         
         # Store and display assistant's response
         chat_history.add_message("assistant", response)
@@ -235,18 +184,16 @@ if user_input:
 
     else:
         # Normal chat mode: generate response without RAG context
-        chain = prompt | model
-        
-        # Generate response with message history
-        response = chain.invoke({
-            "language": st.session_state.language,
-            "rag_messages": chat_history.get_langchain_messages()
-        })
+        response = answer_without_rag(
+            llm=model,
+            chat_history_langchain=chat_history.get_langchain_messages(),
+            language=st.session_state.language
+        )
         
         # Store and display assistant's response
-        chat_history.add_message("assistant", response.content)
+        chat_history.add_message("assistant", response)
         with st.chat_message("assistant"):
-            st.write(response.content)
+            st.write(response)
 
 else:
     # Adding a welcome message at the start of the session
