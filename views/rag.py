@@ -1,26 +1,20 @@
-# Importing modules required for the chatbot functionality, including model setup, history management, and Streamlit UI
-import os
-from dotenv import load_dotenv
+# Importing modules required for the chatbot functionality
+import uuid
 import streamlit as st
 
-# Import backend services and core logic
-from services.llm import create_llm
-from core.rag_pipeline import process_uploaded_pdf, answer_with_rag, answer_without_rag
-from core.chat_history import StreamlitSessionChatHistory
+# Import API client for backend communication
+from services.api_client import (
+    send_chat_message,
+    send_rag_query,
+    upload_document,
+    get_chat_history,
+    clear_chat_history,
+    APIError
+)
 
-load_dotenv()
-
-# Setting Up Langchain Tracing
-os.environ['HF_TOKEN'] = os.getenv('HF_TOKEN')
-os.environ['LANGCHAIN_TRACING_V2'] = 'true'
-
-# Defining a dictionary to map model names to their identifiers for API calls
-model_dict = {
-    "DeepSeek r1":"llama-3.1-8b-instant",
-    "LLaMA 3.1-8B": "llama-3.1-8b-instant",
-    "Gemma2 9B": "gemma2-9b-it",
-    "Mixtral": "mixtral-8x7b-32768",
-}
+# Generate a unique session ID for this user session
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
 
 # Setting up the sidebar for user customization options
 with st.sidebar:
@@ -76,81 +70,92 @@ greetings = {
     "Hindi": "नमस्ते! मैं आज आपकी कैसे मदद कर सकता हूँ?",
 }
 
-# Selecting the appropriate model identifier for API calls based on the user's choice
-selected_model = model_dict[st.session_state.model]
-
-# Initializing the language model with parameters and enabling streaming for real-time responses
-model = create_llm(
-    model_name=selected_model,
-    temperature=temperature,
-    max_tokens=max_tokens
-)
-
 # Setting up the main Streamlit interface and initializing the chatbot UI
 st.title("Research Mate 🤖")
 st.write("Your research-oriented assistant developed by Mitesh😎, ready to assist with academic and research queries!")
 
 uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
 
-# Initialize session state for retriever
-if "retriever" not in st.session_state:
-    st.session_state.retriever = None
+# Initialize session state for document_id (replaces local retriever)
+if "document_id" not in st.session_state:
+    st.session_state.document_id = None
 
-# Process the uploaded document (Only when a new file is uploaded)
+# Process the uploaded document via API (Only when a new file is uploaded)
 if uploaded_file:
-    if "uploaded_file" not in st.session_state or st.session_state.uploaded_file != uploaded_file:
-        st.session_state.uploaded_file = uploaded_file
+    if "uploaded_file_name" not in st.session_state or st.session_state.uploaded_file_name != uploaded_file.name:
+        st.session_state.uploaded_file_name = uploaded_file.name
         with st.spinner("Processing document..."):
-            # Process PDF and create retriever using core RAG pipeline
-            st.session_state.retriever = process_uploaded_pdf(uploaded_file)
-            st.success("Document processed successfully!")
+            try:
+                # Upload PDF via API - backend handles all processing
+                result = upload_document(uploaded_file)
+                st.session_state.document_id = result["document_id"]
+                st.success("Document processed successfully!")
+            except APIError as e:
+                st.error(f"Failed to upload document: {e.message}")
+                st.session_state.document_id = None
 
 
-# Initialize chat history store
-chat_history = StreamlitSessionChatHistory(session_key="rag_messages")
+# Fetch and display chat history from backend
+def display_chat_history():
+    """Fetch chat history from backend and display it."""
+    try:
+        messages = get_chat_history(st.session_state.session_id)
+        for msg in messages:
+            with st.chat_message(msg["role"]):
+                st.write(msg["content"])
+    except APIError:
+        # If history fetch fails, just show empty chat
+        pass
 
-# Displaying chat history to provide a consistent user experience
-for msg in chat_history.get_messages():
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+
+# Display existing chat history
+display_chat_history()
 
 # Capturing user input from the chat input box
 user_input = st.chat_input("Ask a question:")
 if user_input:
-    # Storing the user's input in chat history and displaying it
-    chat_history.add_message("user", user_input)
+    # Display user's message immediately
     with st.chat_message("user"):
         st.write(user_input)
 
-    if st.session_state.retriever:
-        # RAG mode: retrieve context and generate response using RAG pipeline
-        response = answer_with_rag(
-            llm=model,
-            retriever=st.session_state.retriever,
-            user_input=user_input,
-            chat_history_langchain=chat_history.get_langchain_messages(),
-            language=st.session_state.language
-        )
-        
-        # Store and display assistant's response
-        chat_history.add_message("assistant", response)
+    try:
+        if st.session_state.document_id:
+            # RAG mode: send query to RAG endpoint
+            with st.spinner("Thinking..."):
+                result = send_rag_query(
+                    session_id=st.session_state.session_id,
+                    document_id=st.session_state.document_id,
+                    message=user_input,
+                    language=st.session_state.language
+                )
+            
+            # Display assistant's response
+            with st.chat_message("assistant"):
+                st.write(result["content"])
+        else:
+            # Normal chat mode: send message to chat endpoint
+            with st.spinner("Thinking..."):
+                result = send_chat_message(
+                    session_id=st.session_state.session_id,
+                    message=user_input,
+                    language=st.session_state.language
+                )
+            
+            # Display assistant's response
+            with st.chat_message("assistant"):
+                st.write(result["content"])
+                
+    except APIError as e:
         with st.chat_message("assistant"):
-            st.write(response)
-
-    else:
-        # Normal chat mode: generate response without RAG context
-        response = answer_without_rag(
-            llm=model,
-            chat_history_langchain=chat_history.get_langchain_messages(),
-            language=st.session_state.language
-        )
-        
-        # Store and display assistant's response
-        chat_history.add_message("assistant", response)
-        with st.chat_message("assistant"):
-            st.write(response)
+            st.error(f"Error: {e.message}")
 
 else:
-    # Adding a welcome message at the start of the session
-    with st.chat_message(""): 
-        st.write(greetings[st.session_state.language])
+    # Adding a welcome message at the start of the session (only if no history)
+    try:
+        messages = get_chat_history(st.session_state.session_id)
+        if not messages:
+            with st.chat_message("assistant"): 
+                st.write(greetings[st.session_state.language])
+    except APIError:
+        with st.chat_message("assistant"): 
+            st.write(greetings[st.session_state.language])
