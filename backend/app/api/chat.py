@@ -58,7 +58,7 @@ def chat(
         llm = get_llm()
         
         # Generate response using core logic (no RAG)
-        from core.rag_pipeline import 
+        from core.rag_pipeline import answer_without_rag 
         response_content = answer_without_rag(
             llm=llm,
             chat_history_langchain=chat_history_langchain,
