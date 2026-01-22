@@ -22,7 +22,7 @@ sys.path.insert(0, str(project_root))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import chat, rag, documents, history
+from .api import chat, rag, documents, history, agent
 
 # Create FastAPI application
 app = FastAPI(
@@ -36,6 +36,7 @@ ResearchMate FastAPI Backend - A thin orchestration layer for research assistanc
 * **RAG**: Document-based question answering with retrieval-augmented generation
 * **Documents**: PDF upload and processing for RAG
 * **History**: Session-based chat history management
+* **Agent**: Deterministic intent-based routing agent
 
 ## Design Principles
 
@@ -66,6 +67,7 @@ app.include_router(chat.router)
 app.include_router(rag.router)
 app.include_router(documents.router)
 app.include_router(history.router)
+app.include_router(agent.router)
 
 
 @app.get(
