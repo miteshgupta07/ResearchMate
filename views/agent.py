@@ -1,18 +1,18 @@
 # Importing necessary modules
 import uuid
+import requests
 import streamlit as st
 
-# Import API client for backend communication
-from services.api_client import (
-    send_chat_message,
-    get_chat_history,
-    clear_chat_history,
-    APIError
-)
+# Backend API configuration
+API_BASE_URL = "http://localhost:8000"
 
-# Generate a unique session ID for this user session (separate from RAG session)
-if "agent_session_id" not in st.session_state:
-    st.session_state.agent_session_id = str(uuid.uuid4())
+# Generate a unique session ID for this user session
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+# Initialize message history in session state
+if "agent_messages" not in st.session_state:
+    st.session_state.agent_messages = []
 
 # Sidebar for customization options
 with st.sidebar:
@@ -57,54 +57,68 @@ st.title("Research Mate 🤖")
 st.write("Your research-oriented assistant developed by Mitesh😎, ready to assist with academic and research queries!")
 
 
-# Fetch and display chat history from backend
-def display_agent_chat_history():
-    """Fetch chat history from backend and display it."""
-    try:
-        messages = get_chat_history(st.session_state.agent_session_id)
-        for msg in messages:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
-    except APIError:
-        # If history fetch fails, just show empty chat
-        pass
+def send_agent_message(session_id: str, message: str, document_id: str = None, language: str = None) -> dict:
+    """Send a message to the agent backend and return the response."""
+    payload = {
+        "session_id": session_id,
+        "message": message,
+        "document_id": document_id,
+        "language": language
+    }
+    
+    response = requests.post(
+        f"{API_BASE_URL}/agent/route",
+        json=payload,
+        timeout=60
+    )
+    response.raise_for_status()
+    return response.json()
 
 
-# Display existing chat history
-display_agent_chat_history()
+# Display existing chat history from session state
+for msg in st.session_state.agent_messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
+
+# Show welcome message if no messages yet
+if not st.session_state.agent_messages:
+    with st.chat_message("assistant"):
+        st.write(greetings[st.session_state.get("language", "English")])
 
 # User input
 user_input = st.chat_input("Ask a question...")
 
 if user_input:
+    # Add user message to history
+    st.session_state.agent_messages.append({"role": "user", "content": user_input})
+    
     # Display user's message immediately
     with st.chat_message("user"):
         st.write(user_input)
 
     try:
-        # Send message to chat endpoint
+        # Send message to agent endpoint
         with st.spinner("Thinking..."):
-            result = send_chat_message(
-                session_id=st.session_state.agent_session_id,
+            # Get document_id if available in session state
+            document_id = st.session_state.get("document_id", None)
+            
+            result = send_agent_message(
+                session_id=st.session_state.session_id,
                 message=user_input,
-                language=st.session_state["language"]
+                document_id=document_id,
+                language=st.session_state.get("language", "English")
             )
+        
+        # Add assistant response to history
+        assistant_content = result.get("content", "")
+        st.session_state.agent_messages.append({"role": "assistant", "content": assistant_content})
         
         # Display assistant's response
         with st.chat_message("assistant"):
-            st.write(result["content"])
+            st.write(assistant_content)
             
-    except APIError as e:
+    except requests.exceptions.RequestException as e:
+        error_message = f"Error communicating with backend: {str(e)}"
+        st.session_state.agent_messages.append({"role": "assistant", "content": error_message})
         with st.chat_message("assistant"):
-            st.error(f"Error: {e.message}")
-
-else:
-    # Adding a welcome message at the start of the session (only if no history)
-    try:
-        messages = get_chat_history(st.session_state.agent_session_id)
-        if not messages:
-            with st.chat_message("assistant"): 
-                st.write(greetings[st.session_state["language"]])
-    except APIError:
-        with st.chat_message("assistant"): 
-            st.write(greetings[st.session_state["language"]])
+            st.error(error_message)
