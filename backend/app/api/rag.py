@@ -8,11 +8,8 @@ This is a thin transport layer that delegates to core RAG logic.
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..schemas.rag import RAGQueryRequest, RAGQueryResponse
-from ..core.deps import (
-    get_chat_history_store,
-    get_llm,
-    InMemoryChatHistoryStore
-)
+from ..core.deps import get_chat_history_store, get_llm
+from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
@@ -25,7 +22,7 @@ router = APIRouter(prefix="/rag", tags=["RAG"])
 )
 def rag_query(
     request: RAGQueryRequest,
-    history_store: InMemoryChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
 ) -> RAGQueryResponse:
     """
     Handle a RAG query and generate a response based on document context.

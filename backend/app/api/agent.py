@@ -17,7 +17,7 @@ from ..schemas.agent import AgentRequest, AgentResponse
 from ..core.deps import (
     get_chat_history_store,
     get_llm,
-    InMemoryChatHistoryStore
+    PostgresChatHistoryStore
 )
 
 router = APIRouter(prefix="/agent", tags=["Agent"])
@@ -167,7 +167,7 @@ def classify_intent(llm, message: str, document_id: Optional[str]) -> Tuple[str,
 
 def route_to_chat(
     llm,
-    history_store: InMemoryChatHistoryStore,
+    history_store: PostgresChatHistoryStore,
     session_id: str,
     message: str,
     language: str
@@ -198,7 +198,7 @@ def route_to_chat(
 
 def route_to_rag_qa(
     llm,
-    history_store: InMemoryChatHistoryStore,
+    history_store: PostgresChatHistoryStore,
     session_id: str,
     document_id: str,
     message: str,
@@ -240,7 +240,7 @@ def route_to_rag_qa(
 
 def route_to_rag_summary(
     llm,
-    history_store: InMemoryChatHistoryStore,
+    history_store: PostgresChatHistoryStore,
     session_id: str,
     document_id: str,
     language: str
@@ -514,7 +514,7 @@ def assemble_response(
 )
 def agent_route(
     request: AgentRequest,
-    history_store: InMemoryChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
 ) -> AgentResponse:
     """
     Handle agent routing with deterministic single-pass execution.

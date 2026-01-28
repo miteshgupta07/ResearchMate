@@ -12,10 +12,8 @@ from ..schemas.history import (
     HistoryClearResponse,
     MessageItem
 )
-from ..core.deps import (
-    get_chat_history_store,
-    InMemoryChatHistoryStore
-)
+from ..core.deps import get_chat_history_store
+from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(prefix="/history", tags=["History"])
 
@@ -28,7 +26,7 @@ router = APIRouter(prefix="/history", tags=["History"])
 )
 def get_history(
     session_id: str = Query(..., description="The session identifier", min_length=1),
-    history_store: InMemoryChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
 ) -> HistoryResponse:
     """
     Get chat history for a specific session.
@@ -59,7 +57,7 @@ def get_history(
 )
 def clear_history(
     session_id: str = Query(..., description="The session identifier", min_length=1),
-    history_store: InMemoryChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
 ) -> HistoryClearResponse:
     """
     Clear chat history for a specific session.
