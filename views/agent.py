@@ -57,13 +57,24 @@ st.title("Research Mate 🤖")
 st.write("Your research-oriented assistant developed by Mitesh😎, ready to assist with academic and research queries!")
 
 
-def send_agent_message(session_id: str, message: str, document_id: str = None, language: str = None) -> dict:
+def send_agent_message(
+    session_id: str,
+    message: str,
+    document_id: str = None,
+    language: str = None,
+    model_type: str = None,
+    temperature: float = None,
+    max_tokens: int = None
+) -> dict:
     """Send a message to the agent backend and return the response."""
     payload = {
         "session_id": session_id,
         "message": message,
         "document_id": document_id,
-        "language": language
+        "language": language,
+        "model_type": model_type,
+        "temperature": temperature,
+        "max_tokens": max_tokens
     }
     
     response = requests.post(
@@ -106,7 +117,10 @@ if user_input:
                 session_id=st.session_state.session_id,
                 message=user_input,
                 document_id=document_id,
-                language=st.session_state.get("language", "English")
+                language=st.session_state.get("language", "English"),
+                model_type=st.session_state.get("model", None),
+                temperature=temperature,
+                max_tokens=max_tokens
             )
         
         # Add assistant response to history

@@ -126,7 +126,10 @@ if user_input:
                     session_id=st.session_state.session_id,
                     document_id=st.session_state.document_id,
                     message=user_input,
-                    language=st.session_state.language
+                    language=st.session_state.language,
+                    model_type=st.session_state.get("model", None),
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
             
             # Display assistant's response
@@ -138,7 +141,10 @@ if user_input:
                 result = send_chat_message(
                     session_id=st.session_state.session_id,
                     message=user_input,
-                    language=st.session_state.language
+                    language=st.session_state.language,
+                    model_type=st.session_state.get("model", None),
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
             
             # Display assistant's response
