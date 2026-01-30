@@ -29,7 +29,9 @@ def get_chat_history_store() -> PostgresChatHistoryStore:
     return _chat_history_store
 
 
-def get_llm():
+def get_llm(model_type: str = None,
+            temperature: float = None,
+            max_tokens: int = None):
     """
     Get a configured LLM instance for chat and RAG operations.
     
@@ -40,7 +42,7 @@ def get_llm():
     
     # Default model configuration for API usage
     return create_llm(
-        model_name="llama-3.3-70b-versatile",
-        temperature=0.7,
-        max_tokens=512
+        model_name=model_type or "llama-3.3-70b-versatile",
+        temperature=temperature if temperature is not None else 0.7,
+        max_tokens=max_tokens if max_tokens is not None else 512
     )
