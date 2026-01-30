@@ -30,6 +30,21 @@ class RAGQueryRequest(BaseModel):
         default="English",
         description="Target language for the response"
     )
+    model_type: Optional[str] = Field(
+        default=None,
+        description="Frontend model name (e.g., 'DeepSeek r1', 'LLaMA 3.1-8B')"
+    )
+    temperature: Optional[float] = Field(
+        default=None,
+        description="Temperature for response generation (0.0-1.0)",
+        ge=0.0,
+        le=1.0
+    )
+    max_tokens: Optional[int] = Field(
+        default=None,
+        description="Maximum tokens in generated response",
+        gt=0
+    )
     
     model_config = {
         "json_schema_extra": {
@@ -38,7 +53,10 @@ class RAGQueryRequest(BaseModel):
                     "session_id": "user-123-session-1",
                     "document_id": "7c3421af-5fa1-47c7-8555-6b763e06d666",
                     "message": "What are the main findings of this paper?",
-                    "language": "English"
+                    "language": "English",
+                    "model_type": "LLaMA 3.1-8B",
+                    "temperature": 0.7,
+                    "max_tokens": 512
                 }
             ]
         }
