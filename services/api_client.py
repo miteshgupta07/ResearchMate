@@ -23,7 +23,10 @@ class APIError(Exception):
 def send_chat_message(
     session_id: str,
     message: str,
-    language: str = "English"
+    language: str = "English",
+    model_type: str = None,
+    temperature: float = None,
+    max_tokens: int = None
 ) -> Dict[str, Any]:
     """
     Send a chat message to the backend and get a response.
@@ -32,6 +35,9 @@ def send_chat_message(
         session_id: Unique session identifier
         message: The user's message
         language: Target language for the response
+        model_type: Frontend model name (e.g., 'DeepSeek r1', 'LLaMA 3.1-8B')
+        temperature: Temperature for response generation (0.0-1.0)
+        max_tokens: Maximum tokens in generated response
     
     Returns:
         Dict with 'role' and 'content' keys
@@ -43,7 +49,10 @@ def send_chat_message(
     payload = {
         "session_id": session_id,
         "message": message,
-        "language": language
+        "language": language,
+        "model_type": model_type,
+        "temperature": temperature,
+        "max_tokens": max_tokens
     }
     
     try:
@@ -58,7 +67,10 @@ def send_rag_query(
     session_id: str,
     document_id: str,
     message: str,
-    language: str = "English"
+    language: str = "English",
+    model_type: str = None,
+    temperature: float = None,
+    max_tokens: int = None
 ) -> Dict[str, Any]:
     """
     Send a RAG query to the backend and get a response based on document context.
@@ -68,6 +80,9 @@ def send_rag_query(
         document_id: The ID of the document to query against
         message: The user's query
         language: Target language for the response
+        model_type: Frontend model name (e.g., 'DeepSeek r1', 'LLaMA 3.1-8B')
+        temperature: Temperature for response generation (0.0-1.0)
+        max_tokens: Maximum tokens in generated response
     
     Returns:
         Dict with 'role', 'content', and 'sources' keys
@@ -80,7 +95,10 @@ def send_rag_query(
         "session_id": session_id,
         "document_id": document_id,
         "message": message,
-        "language": language
+        "language": language,
+        "model_type": model_type,
+        "temperature": temperature,
+        "max_tokens": max_tokens
     }
     
     try:
