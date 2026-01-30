@@ -36,7 +36,7 @@ def rag_query(
     6. Returns the response with sources
     
     Args:
-        request: RAG query request with session_id, document_id, message, and optional language
+        request: RAG query request with session_id, document_id, message, and optional language/LLM config
         history_store: Injected chat history store
     
     Returns:
@@ -62,8 +62,12 @@ def rag_query(
         # Get chat history in LangChain format
         chat_history_langchain = history_store.get_langchain_messages()
         
-        # Get LLM instance
-        llm = get_llm()
+        # Get LLM instance with dynamic configuration
+        llm = get_llm(
+            model_type=request.model_type,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens
+        )
         
         # Generate response using RAG (core logic)
         response_content = answer_query(

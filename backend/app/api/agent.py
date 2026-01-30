@@ -522,15 +522,19 @@ def agent_route(
     Pipeline: PreChecks → IntentClassifier → CapabilityRouter → ResponseAssembler
     
     Args:
-        request: Agent request with session_id, message, optional document_id and language
+        request: Agent request with session_id, message, optional document_id, language, and LLM config
         history_store: Injected chat history store
     
     Returns:
         AgentResponse with intent, confidence, content, and metadata
     """
     try:
-        # Get LLM instance
-        llm = get_llm()
+        # Get LLM instance with dynamic configuration
+        llm = get_llm(
+            model_type=request.model_type,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens
+        )
         
         # Extract request parameters
         session_id = request.session_id

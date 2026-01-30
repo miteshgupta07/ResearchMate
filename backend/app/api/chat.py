@@ -35,12 +35,13 @@ def chat(
     5. Returns the response
     
     Args:
-        request: Chat request with session_id, message, and optional language
+        request: Chat request with session_id, message, and optional language/LLM config
         history_store: Injected chat history store
     
     Returns:
         ChatResponse with the assistant's message
     """
+
     try:
         # Set session context
         history_store.set_session(request.session_id)
@@ -50,10 +51,13 @@ def chat(
         
         # Get chat history in LangChain format
         chat_history_langchain = history_store.get_langchain_messages()
-        
-        # Get LLM instance
-        llm = get_llm()
-        
+
+        # Get LLM instance with dynamic configuration
+        llm = get_llm(
+            model_type=request.model_type,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens
+        )
         # Generate response using core logic (no RAG)
         from core.rag_pipeline import answer_without_rag 
         response_content = answer_without_rag(
@@ -61,10 +65,8 @@ def chat(
             chat_history_langchain=chat_history_langchain,
             language=request.language or "English"
         )
-        
         # Add assistant response to history
         history_store.add_message("assistant", response_content)
-        
         return ChatResponse(
             role="assistant",
             content=response_content
