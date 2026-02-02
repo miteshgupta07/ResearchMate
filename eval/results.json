@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-02-02T21:09:27.586513",
+  "metrics": {
+    "recall@3": 0.7846,
+    "recall@5": 0.8615,
+    "recall@10": 0.9692,
+    "mrr": 0.7236,
+    "groundedness": 0.6519,
+    "grounded_ratio": 1.0,
+    "total_queries": 65,
+    "queries_with_retrieval": 65,
+    "queries_with_groundedness": 65
+  }
+}
