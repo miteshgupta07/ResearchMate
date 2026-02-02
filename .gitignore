@@ -8,6 +8,7 @@ data/
 *.so
 Upgrade.md
 temp*.*
+pdf/
 # Distribution / packaging
 .Python
 build/
