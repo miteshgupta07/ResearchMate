@@ -27,7 +27,7 @@ class ChatRequest(BaseModel):
     )
     model_type: Optional[str] = Field(
         default=None,
-        description="Frontend model name (e.g., 'DeepSeek r1', 'LLaMA 3.1-8B')"
+        description="Frontend model name (e.g. 'LLaMA 3.1-8B')"
     )
     temperature: Optional[float] = Field(
         default=None,
