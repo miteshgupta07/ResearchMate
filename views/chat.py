@@ -1,4 +1,6 @@
-# Importing modules required for the chatbot functionality
+# Unified Chat View
+# Combines normal chat, RAG, and Agent workflows in a single Streamlit UI
+
 import uuid
 import streamlit as st
 
@@ -6,6 +8,7 @@ import streamlit as st
 from frontend.api_client import (
     send_chat_message,
     send_rag_query,
+    send_agent_message,
     upload_document,
     get_chat_history,
     clear_chat_history,
@@ -16,34 +19,55 @@ from frontend.api_client import (
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
+# Initialize document_id in session state
+if "document_id" not in st.session_state:
+    st.session_state.document_id = None
+
+# Initialize agent mode in session state
+if "agent_enabled" not in st.session_state:
+    st.session_state.agent_enabled = False
+
 # Setting up the sidebar for user customization options
 with st.sidebar:
+    # Agent Mode Toggle
+    with st.expander("**Agent Mode**", icon="🤖"):
+        agent_enabled = st.toggle(
+            "Enable Agent Mode",
+            value=st.session_state.agent_enabled,
+            help="When enabled, your queries will be processed by the AI agent which can perform complex research tasks."
+        )
+        st.session_state.agent_enabled = agent_enabled
+        
+        if agent_enabled:
+            st.info("Agent Mode is ON. Your queries will be routed to the agent for advanced processing.")
+        else:
+            st.caption("Agent Mode is OFF. Using normal chat or RAG based on document upload.")
+
     # Adding a dropdown for language selection to support multilingual capabilities
-    with st.expander("**Language Options**",icon="🌐"):
+    with st.expander("**Language Options**", icon="🌐"):
         language = st.selectbox(
             "Select Model Language",
             ["English", "Hindi", "Spanish", "French", "German"],
         )
-        st.session_state.language = language  # Storing the selected language in session state
+        st.session_state.language = language
 
     # Adding an expandable section for model customization
     with st.expander("**Model Customization**", icon="🛠️"):
         # Allowing the user to select the model type for generating responses
         model_type = st.selectbox(
             "**Choose model type**",
-            ["DeepSeek r1","LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
+            ["LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
             help="Select the model type you want to use for generating responses. Each model has different strengths and use cases.",
         )
         model_desc = {
-            "DeepSeek r1":"DeepSeek's initial large language model, known for its robust research-oriented capabilities and strong performance in coding and multilingual reasoning tasks.",
             "LLaMA 3.1-8B": "LLaMA (Large Language Model Meta AI) 3.1-8B is a versatile language model developed by Meta, featuring 8 billion parameters. It excels in a variety of natural language processing tasks such as text generation, summarization, and translation, while maintaining efficiency and reliability in performance.",
             "Gemma2 9B": "Gemma2 is a large-scale language model with 9 billion parameters, known for its ability to generate highly coherent, contextually accurate, and nuanced text. It is suited for applications that require creative content generation, such as dialogue systems, storytelling, and more.",
             "Mixtral": "Mixtral is a multi-modal AI model optimized for both text and image processing. This model integrates visual and textual information to enable tasks like image captioning, text-to-image generation, and interactive storytelling, offering a creative approach to AI applications."
-            }
+        }
         
         # Displaying detailed descriptions for each model based on user selection
-        st.session_state.model=model_type
-        st.markdown(f"**Selected Model:** {model_type}",help=model_desc[model_type])
+        st.session_state.model = model_type
+        st.markdown(f"**Selected Model:** {model_type}", help=model_desc[model_type])
 
         # Adding sliders to allow fine-tuning of model parameters
         temperature = st.slider(
@@ -61,6 +85,9 @@ with st.sidebar:
             help="Controls the maximum number of tokens the model can generate in its response. Higher values allow for longer responses.",
         )
 
+    # File uploader for PDF documents (RAG functionality)
+    uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
+
 # Displaying a greeting message based on the selected language
 greetings = {
     "English": "Hi! How can I assist you today?",
@@ -70,15 +97,17 @@ greetings = {
     "Hindi": "नमस्ते! मैं आज आपकी कैसे मदद कर सकता हूँ?",
 }
 
-# Setting up the main Streamlit interface and initializing the chatbot UI
+# Setting up the main Streamlit interface
 st.title("Research Mate 🤖")
 st.write("Your research-oriented assistant developed by Mitesh😎, ready to assist with academic and research queries!")
 
-uploaded_file = st.sidebar.file_uploader("Upload a PDF file", type=["pdf"])
-
-# Initialize session state for document_id (replaces local retriever)
-if "document_id" not in st.session_state:
-    st.session_state.document_id = None
+# Show current mode indicator
+if st.session_state.agent_enabled:
+    st.caption("🤖 **Agent Mode** - Advanced research capabilities enabled")
+elif st.session_state.document_id:
+    st.caption("📄 **RAG Mode** - Querying uploaded document")
+else:
+    st.caption("💬 **Chat Mode** - General conversation")
 
 # Process the uploaded document via API (Only when a new file is uploaded)
 if uploaded_file:
@@ -103,25 +132,38 @@ def display_chat_history():
         for msg in messages:
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
+        return messages
     except APIError:
         # If history fetch fails, just show empty chat
-        pass
+        return []
 
 
 # Display existing chat history
-display_chat_history()
+existing_messages = display_chat_history()
 
 # Capturing user input from the chat input box
-user_input = st.chat_input("Ask a question:")
+user_input = st.chat_input("Ask a question...")
+
 if user_input:
     # Display user's message immediately
     with st.chat_message("user"):
         st.write(user_input)
 
     try:
-        if st.session_state.document_id:
-            # RAG mode: send query to RAG endpoint
-            with st.spinner("Thinking..."):
+        with st.spinner("Thinking..."):
+            if st.session_state.agent_enabled:
+                # Agent mode: send query to agent endpoint
+                result = send_agent_message(
+                    session_id=st.session_state.session_id,
+                    message=user_input,
+                    document_id=st.session_state.document_id,
+                    language=st.session_state.language,
+                    model_type=st.session_state.get("model", None),
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+            elif st.session_state.document_id:
+                # RAG mode: send query to RAG endpoint
                 result = send_rag_query(
                     session_id=st.session_state.session_id,
                     document_id=st.session_state.document_id,
@@ -131,13 +173,8 @@ if user_input:
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
-            
-            # Display assistant's response
-            with st.chat_message("assistant"):
-                st.write(result["content"])
-        else:
-            # Normal chat mode: send message to chat endpoint
-            with st.spinner("Thinking..."):
+            else:
+                # Normal chat mode: send message to chat endpoint
                 result = send_chat_message(
                     session_id=st.session_state.session_id,
                     message=user_input,
@@ -146,10 +183,10 @@ if user_input:
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
-            
-            # Display assistant's response
-            with st.chat_message("assistant"):
-                st.write(result["content"])
+        
+        # Display assistant's response
+        with st.chat_message("assistant"):
+            st.write(result.get("content", ""))
                 
     except APIError as e:
         with st.chat_message("assistant"):
@@ -157,11 +194,6 @@ if user_input:
 
 else:
     # Adding a welcome message at the start of the session (only if no history)
-    try:
-        messages = get_chat_history(st.session_state.session_id)
-        if not messages:
-            with st.chat_message("assistant"): 
-                st.write(greetings[st.session_state.language])
-    except APIError:
-        with st.chat_message("assistant"): 
+    if not existing_messages:
+        with st.chat_message("assistant"):
             st.write(greetings[st.session_state.language])
