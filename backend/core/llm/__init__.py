@@ -15,6 +15,9 @@ from .service import (
     DEFAULT_TEMPERATURE,
     DEFAULT_MAX_TOKENS,
     MODEL_MAPPING,
+    LLMRegistry,
+    get_llm_registry,
+    initialize_llm_registry,
 )
 
 __all__ = [
@@ -27,4 +30,7 @@ __all__ = [
     "DEFAULT_TEMPERATURE",
     "DEFAULT_MAX_TOKENS",
     "MODEL_MAPPING",
+    "LLMRegistry",
+    "get_llm_registry",
+    "initialize_llm_registry",
 ]
