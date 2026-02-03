@@ -35,7 +35,7 @@ def send_chat_message(
         session_id: Unique session identifier
         message: The user's message
         language: Target language for the response
-        model_type: Frontend model name (e.g., 'DeepSeek r1', 'LLaMA 3.1-8B')
+        model_type: Frontend model name (e.g. 'LLaMA 3.1-8B')
         temperature: Temperature for response generation (0.0-1.0)
         max_tokens: Maximum tokens in generated response
     
@@ -80,7 +80,7 @@ def send_rag_query(
         document_id: The ID of the document to query against
         message: The user's query
         language: Target language for the response
-        model_type: Frontend model name (e.g., 'DeepSeek r1', 'LLaMA 3.1-8B')
+        model_type: Frontend model name (e.g. 'LLaMA 3.1-8B')
         temperature: Temperature for response generation (0.0-1.0)
         max_tokens: Maximum tokens in generated response
     
@@ -186,6 +186,52 @@ def clear_chat_history(session_id: str) -> Dict[str, str]:
         return response.json()
     except requests.exceptions.RequestException as e:
         raise APIError(f"Failed to clear chat history: {str(e)}")
+
+
+def send_agent_message(
+    session_id: str,
+    message: str,
+    document_id: str = None,
+    language: str = "English",
+    model_type: str = None,
+    temperature: float = None,
+    max_tokens: int = None
+) -> Dict[str, Any]:
+    """
+    Send a message to the agent backend and return the response.
+    
+    Args:
+        session_id: Unique session identifier
+        message: The user's message
+        document_id: Optional document ID for RAG context
+        language: Target language for the response
+        model_type: Frontend model name (e.g. 'LLaMA 3.1-8B')
+        temperature: Temperature for response generation (0.0-1.0)
+        max_tokens: Maximum tokens in generated response
+    
+    Returns:
+        Dict with agent response data
+    
+    Raises:
+        APIError: If the request fails
+    """
+    url = f"{API_BASE_URL}/agent/route"
+    payload = {
+        "session_id": session_id,
+        "message": message,
+        "document_id": document_id,
+        "language": language,
+        "model_type": model_type,
+        "temperature": temperature,
+        "max_tokens": max_tokens
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=120)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise APIError(f"Failed to send agent message: {str(e)}")
 
 
 def check_backend_health() -> bool:
