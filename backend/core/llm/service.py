@@ -23,7 +23,6 @@ DEFAULT_MAX_TOKENS = 512
 
 # Frontend model name → Backend model identifier mapping
 MODEL_MAPPING = {
-    "DeepSeek r1": "deepseek-r1-distill-llama-70b",
     "LLaMA 3.1-8B": "llama-3.1-8b-instant",
     "Gemma2 9B": "gemma2-9b-it",
     "Mixtral": "mixtral-8x7b-32768",
@@ -105,7 +104,7 @@ class LLMRegistry:
         3. Returns a configured instance with temperature and max_tokens applied
         
         Args:
-            model_type: Frontend model name (e.g., "DeepSeek r1", "LLaMA 3.1-8B")
+            model_type: Frontend model name (e.g., "LLaMA 3.1-8B")
             temperature: Controls randomness in responses (0.0-1.0), defaults to 0.7
             max_tokens: Maximum tokens in generated response, defaults to 512
         
@@ -176,7 +175,7 @@ def resolve_model_name(model_type: Optional[str]) -> str:
     Resolve frontend model name to backend model identifier.
     
     Args:
-        model_type: Frontend model name (e.g., "DeepSeek r1", "LLaMA 3.1-8B")
+        model_type: Frontend model name (e.g. "LLaMA 3.1-8B")
     
     Returns:
         Backend model identifier for the Groq API

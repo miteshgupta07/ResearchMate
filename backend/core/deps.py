@@ -48,7 +48,7 @@ def get_llm(
     - model: llama-3.1-8b-instant
     
     Args:
-        model_type: Frontend model name (e.g., "DeepSeek r1", "LLaMA 3.1-8B")
+        model_type: Frontend model name (e.g. "LLaMA 3.1-8B")
         temperature: Controls randomness in responses (0.0-1.0)
         max_tokens: Maximum tokens in generated response
     
