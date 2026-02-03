@@ -161,7 +161,7 @@ class RAGEvaluator:
         """
         if self._llm is None:
             # Import production LLM configuration
-            from services.llm import create_llm
+            from backend.core.llm import create_llm
             self._llm = create_llm(
                 model_name="llama-3.1-8b-instant",
                 temperature=0.7,
@@ -172,7 +172,7 @@ class RAGEvaluator:
         context_text = "\n\n".join(context_chunks)
         
         # Use production RAG prompt
-        from services.llm import create_rag_chat_prompt
+        from backend.core.llm import create_rag_chat_prompt
         from langchain_classic.chains.combine_documents import create_stuff_documents_chain
         from langchain_core.documents import Document
         
