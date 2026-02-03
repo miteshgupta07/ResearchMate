@@ -3,7 +3,7 @@ import uuid
 import streamlit as st
 
 # Import API client for backend communication
-from services.api_client import (
+from frontend.api_client import (
     send_chat_message,
     send_rag_query,
     upload_document,
