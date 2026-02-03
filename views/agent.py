@@ -26,7 +26,7 @@ with st.sidebar:
     with st.expander("**Model Customization**", icon="🛠️"):
         model_type = st.selectbox(
             "**Choose model type**",
-            ["DeepSeek","LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
+            ["DeepSeek r1","LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
         )
         st.session_state["model"] = model_type
 

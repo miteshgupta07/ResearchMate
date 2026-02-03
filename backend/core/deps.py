@@ -6,6 +6,7 @@ It provides the PostgresChatHistoryStore that persists chat history
 to PostgreSQL database.
 """
 
+from typing import Optional
 from .chat_history import PostgresChatHistoryStore
 
 
@@ -29,20 +30,36 @@ def get_chat_history_store() -> PostgresChatHistoryStore:
     return _chat_history_store
 
 
-def get_llm(model_type: str = None,
-            temperature: float = None,
-            max_tokens: int = None):
+def get_llm(
+    model_type: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None
+):
     """
     Get a configured LLM instance for chat and RAG operations.
     
-    Returns:
-        Configured ChatGroq model instance
-    """
-    from backend.core.llm import create_llm
+    This function uses the pre-initialized LLM registry to get a model instance.
+    The registry is initialized at FastAPI startup, so no cold-start delay occurs.
     
-    # Default model configuration for API usage
-    return create_llm(
-        model_name=model_type or "llama-3.3-70b-versatile",
-        temperature=temperature if temperature is not None else 0.7,
-        max_tokens=max_tokens if max_tokens is not None else 512
+    Temperature and max_tokens are applied per-request, not at initialization.
+    Defaults are applied inside the LLM service layer:
+    - temperature: 0.7
+    - max_tokens: 512
+    - model: llama-3.1-8b-instant
+    
+    Args:
+        model_type: Frontend model name (e.g., "DeepSeek r1", "LLaMA 3.1-8B")
+        temperature: Controls randomness in responses (0.0-1.0)
+        max_tokens: Maximum tokens in generated response
+    
+    Returns:
+        Configured ChatGroq model instance with per-request parameters
+    """
+    from backend.core.llm import get_llm_registry
+    
+    registry = get_llm_registry()
+    return registry.get_llm_with_params(
+        model_type=model_type,
+        temperature=temperature,
+        max_tokens=max_tokens
     )

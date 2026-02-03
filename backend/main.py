@@ -21,11 +21,42 @@ sys.path.insert(0, str(project_root))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from .api import chat, rag, documents, history, agent
+from .core.llm import initialize_llm_registry, get_llm_registry
 
-# Create FastAPI application
+
+# ============================================================================
+# LIFESPAN: Startup and Shutdown Events
+# ============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan context manager for startup and shutdown events.
+    
+    Startup:
+    - Initializes all supported LLM models in the registry
+    - This ensures the first request has no cold-start delay
+    
+    Shutdown:
+    - Cleanup resources if needed
+    """
+    # Startup: Initialize LLM registry with all supported models
+    initialize_llm_registry()
+    registry = get_llm_registry()
+    print(f"[Startup] LLM Registry initialized with models: {registry.available_models}")
+    
+    yield
+    
+    # Shutdown: Cleanup (if needed)
+    print("[Shutdown] Application shutting down")
+
+
+# Create FastAPI application with lifespan
 app = FastAPI(
+    lifespan=lifespan,
     title="ResearchMate API",
     description="""
 ResearchMate FastAPI Backend - A thin orchestration layer for research assistance.
