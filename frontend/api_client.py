@@ -7,9 +7,10 @@ All Streamlit views should use this module instead of calling core logic directl
 
 import requests
 from typing import Optional, List, Dict, Any
+from backend.core.config import Config
 
 # Base URL for the FastAPI backend
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = Config.BASE_URL
 
 
 class APIError(Exception):

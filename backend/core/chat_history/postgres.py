@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, MetaData, Table, Column, BigInteger, Strin
 from sqlalchemy.engine import Engine
 
 from .base import ChatHistoryStore
-from ..config import DatabaseConfig
+from ..config import Config as DatabaseConfig
 
 
 # Define table metadata for SQLAlchemy Core

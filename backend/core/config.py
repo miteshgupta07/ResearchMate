@@ -14,7 +14,7 @@ project_root = Path(__file__).parent.parent.parent.parent
 load_dotenv()
 
 
-class DatabaseConfig:
+class Config:
     """Database configuration loaded from environment variables."""
     
     HOST: str = os.getenv("DB_HOST", "localhost")
@@ -22,6 +22,8 @@ class DatabaseConfig:
     NAME: str = os.getenv("DB_NAME", "researchmate_db")
     USER: str = os.getenv("DB_USER", "postgres")
     PASSWORD: str = os.getenv("DB_PASSWORD", "")
+
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
     
     @classmethod
     def get_connection_url(cls) -> str:
