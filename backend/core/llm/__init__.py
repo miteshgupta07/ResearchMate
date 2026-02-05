@@ -14,10 +14,13 @@ from .service import (
     DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
     DEFAULT_MAX_TOKENS,
+    MAX_CONTINUATION_ATTEMPTS,
+    CONTINUATION_MAX_TOKENS,
     MODEL_MAPPING,
     LLMRegistry,
     get_llm_registry,
     initialize_llm_registry,
+    AutoContinueLLM,
 )
 
 __all__ = [
@@ -29,8 +32,11 @@ __all__ = [
     "DEFAULT_MODEL",
     "DEFAULT_TEMPERATURE",
     "DEFAULT_MAX_TOKENS",
+    "MAX_CONTINUATION_ATTEMPTS",
+    "CONTINUATION_MAX_TOKENS",
     "MODEL_MAPPING",
     "LLMRegistry",
     "get_llm_registry",
     "initialize_llm_registry",
+    "AutoContinueLLM",
 ]

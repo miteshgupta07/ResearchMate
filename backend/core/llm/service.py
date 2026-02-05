@@ -6,10 +6,14 @@ It provides clean interfaces for chat and RAG-based responses.
 """
 
 import os
-from typing import Optional, Dict
+from typing import Optional, Dict, Any, List, Iterator
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from langchain_core.runnables import Runnable, RunnableConfig
+from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.language_models.chat_models import BaseChatModel
 
 load_dotenv()
 
@@ -20,6 +24,225 @@ load_dotenv()
 DEFAULT_MODEL = "llama-3.1-8b-instant"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 512
+
+# Auto-continuation configuration
+MAX_CONTINUATION_ATTEMPTS = 2
+CONTINUATION_MAX_TOKENS = 512
+CONTINUATION_PROMPT = "Continue from where you left off. Do not repeat what was already said."
+
+
+# ============================================================================
+# AUTO-CONTINUATION WRAPPER
+# ============================================================================
+
+class AutoContinueLLM(Runnable):
+    """
+    Wrapper that handles auto-continuation for truncated LLM responses.
+    
+    This class wraps a ChatGroq instance (or bound runnable) and intercepts
+    invoke calls to automatically continue generation when responses are
+    truncated due to token limits.
+    
+    The wrapper is transparent to callers - they receive a complete response
+    without knowing continuation occurred.
+    
+    Inherits from Runnable to be compatible with LangChain Expression Language (LCEL).
+    """
+    
+    def __init__(
+        self,
+        base_llm: ChatGroq,
+        max_tokens: int,
+        temperature: float
+    ):
+        """
+        Initialize the auto-continuation wrapper.
+        
+        Args:
+            base_llm: The underlying ChatGroq instance
+            max_tokens: The max_tokens setting for initial generation
+            temperature: The temperature setting for generation
+        """
+        self._base_llm = base_llm
+        self._max_tokens = max_tokens
+        self._temperature = temperature
+    
+    @property
+    def InputType(self):
+        """Return input type for LCEL compatibility."""
+        return Any
+    
+    @property
+    def OutputType(self):
+        """Return output type for LCEL compatibility."""
+        return Any
+    
+    def _is_truncated(self, response) -> bool:
+        """
+        Detect if a response was truncated due to token limits.
+        
+        Uses two detection strategies:
+        1. Provider finish_reason == "length" (preferred)
+        2. Heuristic: response doesn't end with . ? !
+        
+        Args:
+            response: The LLM response object
+            
+        Returns:
+            True if the response appears truncated, False otherwise
+        """
+        content = getattr(response, 'content', '')
+        if not content or not content.strip():
+            return False
+        
+        # Strategy 1: Check finish_reason from response metadata
+        if hasattr(response, 'response_metadata'):
+            finish_reason = response.response_metadata.get('finish_reason', '')
+            if finish_reason == 'length':
+                return True
+        
+        # Strategy 2: Heuristic - check if response ends cleanly
+        clean_content = content.strip()
+        if clean_content and clean_content[-1] not in '.?!':
+            return True
+        
+        return False
+    
+    def _request_continuation(self, partial_response: str) -> str:
+        """
+        Request a continuation of a truncated response.
+        
+        Sends a follow-up request with the partial response as context
+        and asks the model to continue from where it left off.
+        
+        Args:
+            partial_response: The truncated response text
+            
+        Returns:
+            The continuation text (may be empty if no meaningful content added)
+        """
+        # Create continuation messages with context
+        continuation_messages = [
+            AIMessage(content=partial_response),
+            HumanMessage(content=CONTINUATION_PROMPT)
+        ]
+        
+        # Use lower token limit for continuation
+        continuation_llm = self._base_llm.bind(
+            max_tokens=CONTINUATION_MAX_TOKENS,
+            temperature=self._temperature
+        )
+        
+        try:
+            continuation_response = continuation_llm.invoke(continuation_messages)
+            return getattr(continuation_response, 'content', '')
+        except Exception:
+            # On any error during continuation, return empty string
+            return ''
+    
+    def _handle_continuation(self, initial_response) -> Any:
+        """
+        Handle auto-continuation for a potentially truncated response.
+        
+        If the initial response is truncated, this method will:
+        1. Request continuations (up to MAX_CONTINUATION_ATTEMPTS)
+        2. Concatenate all parts into a complete response
+        3. Stop early if response ends cleanly or no new tokens added
+        
+        Args:
+            initial_response: The initial LLM response object
+            
+        Returns:
+            The response object with potentially extended content
+        """
+        if not self._is_truncated(initial_response):
+            return initial_response
+        
+        full_content = initial_response.content
+        
+        for _ in range(MAX_CONTINUATION_ATTEMPTS):
+            continuation_text = self._request_continuation(full_content)
+            
+            # Stop if no meaningful tokens added
+            if not continuation_text or not continuation_text.strip():
+                break
+            
+            # Concatenate continuation
+            full_content += continuation_text
+            
+            # Stop if response now ends cleanly
+            clean_content = full_content.strip()
+            if clean_content and clean_content[-1] in '.?!':
+                break
+        
+        # Update response content with full text
+        initial_response.content = full_content
+        return initial_response
+    
+    def invoke(
+        self, 
+        input: Any, 
+        config: Optional[RunnableConfig] = None,
+        **kwargs
+    ) -> Any:
+        """
+        Invoke the LLM with auto-continuation support.
+        
+        This method is compatible with LangChain Expression Language (LCEL).
+        
+        Args:
+            input: The input to the LLM (messages, prompt, etc.)
+            config: Optional RunnableConfig for LCEL compatibility
+            **kwargs: Additional arguments passed to underlying LLM
+            
+        Returns:
+            LLM response with auto-continuation applied if needed
+        """
+        # Get bound LLM with parameters
+        configured_llm = self._base_llm.bind(
+            max_tokens=self._max_tokens,
+            temperature=self._temperature
+        )
+        
+        # Invoke underlying LLM
+        response = configured_llm.invoke(input, config, **kwargs)
+        
+        # Handle potential continuation
+        return self._handle_continuation(response)
+    
+    def bind(self, **kwargs) -> "AutoContinueLLM":
+        """
+        Return a new AutoContinueLLM with updated parameters.
+        
+        This allows callers to further customize the LLM while
+        maintaining auto-continuation support.
+        
+        Args:
+            **kwargs: Parameters to bind (temperature, max_tokens, etc.)
+            
+        Returns:
+            New AutoContinueLLM instance with updated parameters
+        """
+        new_max_tokens = kwargs.pop('max_tokens', self._max_tokens)
+        new_temperature = kwargs.pop('temperature', self._temperature)
+        
+        # If other kwargs remain, bind them to base LLM
+        if kwargs:
+            new_base = self._base_llm.bind(**kwargs)
+        else:
+            new_base = self._base_llm
+        
+        return AutoContinueLLM(new_base, new_max_tokens, new_temperature)
+    
+    def __getattr__(self, name: str) -> Any:
+        """
+        Proxy attribute access to the underlying LLM.
+        
+        This ensures compatibility with code that accesses
+        LLM attributes directly.
+        """
+        return getattr(self._base_llm, name)
+
 
 # Frontend model name → Backend model identifier mapping
 MODEL_MAPPING = {
@@ -94,14 +317,17 @@ class LLMRegistry:
         model_type: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None
-    ) -> ChatGroq:
+    ) -> AutoContinueLLM:
         """
         Get a configured LLM instance with per-request parameters.
         
         This method:
         1. Resolves the frontend model name to backend identifier
         2. Gets the pre-initialized model from the registry
-        3. Returns a configured instance with temperature and max_tokens applied
+        3. Returns an AutoContinueLLM wrapper with temperature and max_tokens applied
+        
+        The returned wrapper handles auto-continuation transparently when
+        responses are truncated due to token limits.
         
         Args:
             model_type: Frontend model name (e.g., "LLaMA 3.1-8B")
@@ -109,7 +335,7 @@ class LLMRegistry:
             max_tokens: Maximum tokens in generated response, defaults to 512
         
         Returns:
-            Configured ChatGroq model instance with per-request parameters
+            AutoContinueLLM wrapper with auto-continuation support
         """
         # Resolve frontend model name to backend identifier
         model_identifier = resolve_model_name(model_type)
@@ -125,11 +351,11 @@ class LLMRegistry:
             # Fallback: if model not in registry, use default
             base_model = self._models.get(DEFAULT_MODEL)
         
-        # Apply per-request parameters by binding them
-        # ChatGroq supports .bind() to create a runnable with bound kwargs
-        return base_model.bind(
-            temperature=effective_temperature,
-            max_tokens=effective_max_tokens
+        # Return AutoContinueLLM wrapper for transparent continuation handling
+        return AutoContinueLLM(
+            base_llm=base_model,
+            max_tokens=effective_max_tokens,
+            temperature=effective_temperature
         )
     
     @property
