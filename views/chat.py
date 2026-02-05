@@ -43,6 +43,10 @@ with st.sidebar:
         else:
             st.caption("Agent Mode is OFF. Using normal chat or RAG based on document upload.")
 
+    # File uploader for PDF documents (RAG functionality)
+    with st.expander("**Attach a Document**", icon="📎"):
+        uploaded_file=st.file_uploader("Upload a pdf",type=["pdf"], help="Upload a PDF document to enable Retrieval-Augmented Generation (RAG) mode. The AI will use the content of the uploaded document to answer your queries more accurately.")
+
     # Adding a dropdown for language selection to support multilingual capabilities
     with st.expander("**Language Options**", icon="🌐"):
         language = st.selectbox(
@@ -85,9 +89,7 @@ with st.sidebar:
             help="Controls the maximum number of tokens the model can generate in its response. Higher values allow for longer responses.",
         )
 
-    # File uploader for PDF documents (RAG functionality)
-    uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
-
+    
 # Displaying a greeting message based on the selected language
 greetings = {
     "English": "Hi! How can I assist you today?",
@@ -150,7 +152,7 @@ if user_input:
         st.write(user_input)
 
     try:
-        with st.spinner("Thinking..."):
+        with st.spinner("Generating response..."):
             if st.session_state.agent_enabled:
                 # Agent mode: send query to agent endpoint
                 result = send_agent_message(
