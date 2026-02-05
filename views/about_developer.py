@@ -1,7 +1,27 @@
 import streamlit as st
 
+# Scoped CSS for layout customization
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-left: 10rem;
+        padding-right: 10rem;
+        max-width: 1400px;
+    }
+    .content-wrapper {
+        margin: 0 auto;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Setting the title for the page
-st.title("About Me 😎")
+st.markdown(
+    "<h1 style='text-align: center;'>About Me 😎</h1>",
+    unsafe_allow_html=True
+)
 
 # Introduction Section
 st.header("👋 Introduction")

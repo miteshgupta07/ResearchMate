@@ -1,9 +1,10 @@
 # Unified Chat View
 # Combines normal chat, RAG, and Agent workflows in a single Streamlit UI
 
+import html
 import uuid
 import streamlit as st
-
+from frontend.css import render_message, render_mode_banner, render_processing_banner, render_generating_banner, render_success_banner, render_error_banner
 # Import API client for backend communication
 from frontend.api_client import (
     send_chat_message,
@@ -13,6 +14,39 @@ from frontend.api_client import (
     get_chat_history,
     clear_chat_history,
     APIError
+)
+
+# Scoped CSS for layout customization
+st.markdown(
+    """
+    <style>
+    :root {
+        --chat-max-width: 750px;
+    }
+    .block-container {
+        padding-left: 10rem;
+        padding-right: 10rem;
+        max-width: 1400px;
+    }
+    .content-wrapper {
+        margin: 0 auto;
+    }
+    .chat-wrapper {
+        max-width: var(--chat-max-width);
+        margin: 0 auto;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    section[data-testid="stChatInput"] {
+        max-width: var(--chat-max-width);
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # Generate a unique session ID for this user session
@@ -26,6 +60,7 @@ if "document_id" not in st.session_state:
 # Initialize agent mode in session state
 if "agent_enabled" not in st.session_state:
     st.session_state.agent_enabled = False
+
 
 # Setting up the sidebar for user customization options
 with st.sidebar:
@@ -100,30 +135,41 @@ greetings = {
 }
 
 # Setting up the main Streamlit interface
-st.title("Research Mate 🤖")
-st.write("Your research-oriented assistant developed by Mitesh😎, ready to assist with academic and research queries!")
+st.markdown(
+    "<h1 style='text-align: center;'>Research Mate 🤖</h1>",
+    unsafe_allow_html=True
+)
+st.markdown(
+    "<p style='text-align: center;'>Your research-oriented assistant developed by Mitesh😎, ready to assist with academic and research queries!</p>",
+    unsafe_allow_html=True
+)
 
-# Show current mode indicator
-if st.session_state.agent_enabled:
-    st.caption("🤖 **Agent Mode** - Advanced research capabilities enabled")
-elif st.session_state.document_id:
-    st.caption("📄 **RAG Mode** - Querying uploaded document")
-else:
-    st.caption("💬 **Chat Mode** - General conversation")
+# Mode indicator banner (replace st.caption usage)
+
+# Call this where you previously used st.caption(...)
+render_mode_banner()
 
 # Process the uploaded document via API (Only when a new file is uploaded)
 if uploaded_file:
     if "uploaded_file_name" not in st.session_state or st.session_state.uploaded_file_name != uploaded_file.name:
         st.session_state.uploaded_file_name = uploaded_file.name
-        with st.spinner("Processing document..."):
-            try:
-                # Upload PDF via API - backend handles all processing
-                result = upload_document(uploaded_file)
-                st.session_state.document_id = result["document_id"]
-                st.success("Document processed successfully!")
-            except APIError as e:
-                st.error(f"Failed to upload document: {e.message}")
-                st.session_state.document_id = None
+        
+        status_placeholder = st.empty()
+        render_processing_banner(status_placeholder, "Processing document…")
+        
+        try:
+            result = upload_document(uploaded_file)
+            st.session_state.document_id = result["document_id"]
+            status_placeholder.empty()
+            
+            success_placeholder = st.empty()
+            render_success_banner(success_placeholder, "Document processed successfully!")
+        except APIError as e:
+            st.session_state.document_id = None
+            status_placeholder.empty()
+            
+            error_placeholder = st.empty()
+            render_error_banner(error_placeholder, f"Failed to upload document: {e.message}")
 
 
 # Fetch and display chat history from backend
@@ -132,8 +178,7 @@ def display_chat_history():
     try:
         messages = get_chat_history(st.session_state.session_id)
         for msg in messages:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
+            render_message(msg["role"], msg["content"])
         return messages
     except APIError:
         # If history fetch fails, just show empty chat
@@ -148,54 +193,59 @@ user_input = st.chat_input("Ask a question...")
 
 if user_input:
     # Display user's message immediately
-    with st.chat_message("user"):
-        st.write(user_input)
+    render_message("user", user_input)
+
+    # Reuse the same styled status banners (no spinner)
+    status_placeholder = st.empty()
 
     try:
-        with st.spinner("Generating response..."):
-            if st.session_state.agent_enabled:
-                # Agent mode: send query to agent endpoint
-                result = send_agent_message(
-                    session_id=st.session_state.session_id,
-                    message=user_input,
-                    document_id=st.session_state.document_id,
-                    language=st.session_state.language,
-                    model_type=st.session_state.get("model", None),
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-            elif st.session_state.document_id:
-                # RAG mode: send query to RAG endpoint
-                result = send_rag_query(
-                    session_id=st.session_state.session_id,
-                    document_id=st.session_state.document_id,
-                    message=user_input,
-                    language=st.session_state.language,
-                    model_type=st.session_state.get("model", None),
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-            else:
-                # Normal chat mode: send message to chat endpoint
-                result = send_chat_message(
-                    session_id=st.session_state.session_id,
-                    message=user_input,
-                    language=st.session_state.language,
-                    model_type=st.session_state.get("model", None),
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
+        render_generating_banner(status_placeholder, "Generating response…")
+
+        if st.session_state.agent_enabled:
+            # Agent mode: send query to agent endpoint
+            result = send_agent_message(
+                session_id=st.session_state.session_id,
+                message=user_input,
+                document_id=st.session_state.document_id,
+                language=st.session_state.language,
+                model_type=st.session_state.get("model", None),
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+        elif st.session_state.document_id:
+            # RAG mode: send query to RAG endpoint
+            result = send_rag_query(
+                session_id=st.session_state.session_id,
+                document_id=st.session_state.document_id,
+                message=user_input,
+                language=st.session_state.language,
+                model_type=st.session_state.get("model", None),
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+        else:
+            # Normal chat mode: send message to chat endpoint
+            result = send_chat_message(
+                session_id=st.session_state.session_id,
+                message=user_input,
+                language=st.session_state.language,
+                model_type=st.session_state.get("model", None),
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+        
+        status_placeholder.empty()
         
         # Display assistant's response
-        with st.chat_message("assistant"):
-            st.write(result.get("content", ""))
+        render_message("assistant", result.get("content", ""))
                 
     except APIError as e:
-        with st.chat_message("assistant"):
-            st.error(f"Error: {e.message}")
+        status_placeholder.empty()
+        
+        error_placeholder = st.empty()
+        render_error_banner(error_placeholder, f"Failed to generate response: {e.message}")
 
 else:
     # Adding a welcome message at the start of the session (only if no history)
     if not existing_messages:
-        with st.chat_message("assistant"):
-            st.write(greetings[st.session_state.language])
+        render_message("assistant", greetings[st.session_state.language])
