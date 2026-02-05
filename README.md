@@ -1,78 +1,150 @@
-# Research Mate: Your Free AI Research Assistant 📚🤖
+# ResearchMate: Your Free AI Research Assistant 📚🤖
 
-**Research Mate** is a powerful AI research assistant designed to streamline your academic and research work. It offers advanced features such as real-time retrieval of research papers, intelligent summarization, and insightful suggestions for similar research papers, making it an indispensable tool for researchers and students alike.
-
----
-
-## 🚀 Features
-- **Upload and Query Research Papers:** Easily upload research papers (PDFs) and ask specific questions to get concise answers.
-- **Real-Time Retrieval from arXiv:** Utilize AI agents to search and fetch relevant research papers directly from arXiv.
-- **Research Paper Summarization:** Generate quick and accurate summaries of research papers.
-- **Similar Research Paper Suggestions:** Get recommendations for papers related to your query or uploaded document.
-- **Persistent Chat History:** Maintain the context of your research queries for a seamless experience.
+**ResearchMate** is a production-ready AI research assistant designed to streamline academic and research work through accurate, document-grounded question answering over research papers. Built with a scalable backend architecture for retrieval-augmented generation (RAG) and conversational interactions, it enables real-time retrieval of research papers, intelligent summarization, and insightful recommendations for related work—making it a reliable and indispensable tool for researchers and students alike.
 
 ---
 
 ## 🌍 Deployment
-Research Mate can be accessed on [**Streamlit**](https://researchmate-chatbot.streamlit.app/) for a smooth and interactive user experience.
- 
----
 
-## 🛠️ How It Works
-1. **Upload a Research Paper:** Users can upload PDF files of research papers.
-2. **Query-Based Interaction:** Ask specific questions related to the uploaded document.
-3. **AI Agent Utilization:** The AI agents handle:
-   - **Summarization:** Providing concise summaries of research papers.
-   - **Paper Search:** Retrieving research papers from arXiv based on the query.
-   - **Suggestions:** Recommending similar research papers for deeper insights.
-4. **Persistent History:** The chat history feature ensures research continuity.
+Research Mate can be accessed on [**https://researchmate.me/**](https://researchmate.me/) for a smooth and interactive user experience.
 
 ---
 
-## 📝 Usage Guide
+## 🚀 Key Features
+
+- **PDF Document Ingestion & Querying**: Upload research papers and ask contextual questions with retrieval-augmented generation
+- **Persistent Chat History**: PostgreSQL-backed conversation storage for maintaining session context across interactions
+- **Agent Workflow**: Optional agent mode for multi-step reasoning, arXiv search, and paper summarization (user-controlled toggle)
+- **Dynamic LLM Configuration**: Runtime control over model selection, temperature, and token limits
+- **Auto-Continuation**: Automatic handling of long-form responses that exceed model context windows
+- **Evaluated RAG Pipeline**: Retrieval accuracy and answer groundedness measured against open benchmarks to reduce hallucinations
+
+---
+
+## 🏗️ System Architecture
+
+ResearchMate follows a decoupled frontend-backend architecture:
+
+- **Frontend**: Streamlit-based user interface for document upload, chat interaction, and configuration controls
+- **Backend**: FastAPI orchestration layer exposing RESTful endpoints for chat, document management, and history
+- **Vector Store**: FAISS for efficient similarity search and document retrieval
+- **Persistence Layer**: PostgreSQL for durable chat history and session management
+- **LLM Service**: Abstracted model registry supporting multiple providers (Groq, HuggingFace, AWS Bedrock)
+
+The backend API is deployed at `https://api.researchmate.me/` and handles all core logic, while the frontend acts as a lightweight client.
+
+---
+
+## 📊 RAG Evaluation & Reliability
+
+ResearchMate emphasizes trustworthy information retrieval:
+
+- **Retrieval Quality**: Evaluated using Recall@K metrics on open research paper benchmarks
+- **Answer Groundedness**: Responses are measured for factual grounding in source documents
+- **Hallucination Mitigation**: Evaluation-driven tuning of chunking strategies and retrieval parameters
+
+The evaluation framework is located in the `eval/` directory and uses standard academic datasets to ensure consistent quality improvements.
+
+---
+
+## 🖥️ Running Locally
+
+### Prerequisites
+- Python 3.11+
+- PostgreSQL (for chat history persistence)
+
+### Setup
+
 1. **Clone the repository:**
 ```bash
 git clone https://github.com/miteshgupta07/ResearchMate.git
 cd ResearchMate
 ```
 
-2. **Install Dependencies:**
+2. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
-3. **Set up API keys:**
-Add your API keys to repository secrets (for deployment) or .env (for local use).
 
-4. **Run the app locally:**
+3. **Configure environment variables:**
+
+Create a `.env` file in the project root:
+```env
+GROQ_API_KEY=your_groq_api_key
+LANGCHAIN_API_KEY=your_langchain_api_key
+HF_TOKEN= your_hf_token
+
+# PostgreSQL Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=researchmate_db
+DB_USER=postgres
+DB_PASSWORD=your_database_password
+
+BASE_URL="http://localhost:8000"
+```
+
+4. **Initialize Database**
+```bash
+# Initialize the PostgreSQL database and create necessary tables
+cd backend
+python init_db.py
+```
+
+5. **Start the backend API:**
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+6. **Start the frontend (in a separate terminal):**
 ```bash
 streamlit run app.py
 ```
 
-## Technologies Used 📊 
-- **Streamlit**: For an interactive user interface.
-- **LangChain**: To manage prompts and chat history.
-- **FAISS**: For efficient retrieval-augmented generation (RAG) processes.
-- **ChatGroq**: High-performance conversational models.
-- **Python**: Core programming language for logic and integration.
+The application will be available at `http://localhost:8501` with API endpoints at `http://localhost:8000`.
 
-## Security 🛡️
-API keys are securely stored as GitHub Repository Secrets or in .env files for local development.
+---
 
-## Contributing 🤝 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or feature suggestions.
+## 🧰 Tech Stack
 
+- **Backend Framework**: FastAPI
+- **Frontend Framework**: Streamlit
+- **Vector Database**: FAISS
+- **Relational Database**: PostgreSQL
+- **LLM Providers**: Groq, HuggingFace
+- **Embedding Models**: HuggingFace Sentence Transformers
+- **Orchestration**: LangChain (document loading, text splitting)
+
+---
+
+## 🗂️ Project Structure
+
+```
+ResearchMate/
+├── backend/           # FastAPI application
+│   ├── api/          # API route handlers
+│   ├── core/         # Core services (LLM, RAG, chat history)
+│   └── schemas/      # Pydantic models
+├── frontend/         # Streamlit client utilities
+├── eval/             # RAG evaluation framework
+├── data/             # Document storage and vector indexes
+└── views/            # Streamlit page components
+```
+
+---
+
+## Contributing 🤝
+
+Contributions are welcome. Please open an issue for discussion before submitting substantial changes.
+
+---
 
 ## License 📝
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/miteshgupta07/ResearchMate/blob/main/LICENSE) file for details.
 
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/miteshgupta07/ResearchMate/blob/main/LICENSE) file for details.
 
-
-## Acknowledgments 🙏 
-- **LangChain**: For robust history and prompt management.
-- **Groq Models**: For providing state-of-the-art conversational AI capabilities.
-- **Streamlit Community**: For helpful resources and support.
-- **FAISS**: For enabling fast and accurate research retrieval.
-- **ArXiv**: For access to a vast repository of research papers.
+---
 
 ## Contact
-For inquiries or collaborations, please contact me at [miteshgupta2711@gmail.com](mailto:miteshgupta2711@gmail.com).
+
+For inquiries or collaborations, contact [miteshgupta2711@gmail.com](mailto:miteshgupta2711@gmail.com).
