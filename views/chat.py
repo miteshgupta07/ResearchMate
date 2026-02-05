@@ -39,10 +39,10 @@ st.markdown(
     }
     section[data-testid="stChatInput"] {
         max-width: var(--chat-max-width);
-        margin-left: auto;
-        margin-right: auto;
-        padding-left: 1rem;
-        padding-right: 1rem;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
     </style>
     """,

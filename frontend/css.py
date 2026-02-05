@@ -1,65 +1,53 @@
 import html
 import streamlit as st
 
+import streamlit as st
+
+import streamlit as st
+
 def render_message(role: str, content: str):
-    """
-    Render a chat message as a styled bubble.
-    - User messages: right-aligned, light blue background
-    - Assistant messages: left-aligned, light gray background
-    """
-    # Escape HTML to prevent injection
-    safe_content = html.escape(content)
-    # Preserve line breaks
-    safe_content = safe_content.replace("\n", "<br>")
-    
     if role == "user":
-        # User message: right-aligned, red-accent bubble
-        st.markdown(
-            f"""
-            <div class="chat-wrapper">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
-                    <div style="
-                        background-color: #ff3b3b;
-                        color: #ffffff;
-                        padding: 12px 16px;
-                        border-radius: 18px 18px 4px 18px;
-                        max-width: 70%;
-                        word-wrap: break-word;
-                        border: 1px solid #ff5c5c;
-                        font-size: 14px;
-                        line-height: 1.5;
-                    ">
-                        {safe_content}
-                    </div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        justify = "flex-end"
+        bubble_bg = "#ff3b3b"
+        bubble_border = "#ff5c5c"
+        bubble_radius = "18px 18px 4px 18px"
+        text_color = "#ffffff"
+        side_padding = "48px 16px 0 64px"   # top right bottom left
     else:
-        # Assistant message: left-aligned, dark neutral bubble
-        st.markdown(
-            f"""
-            <div class="chat-wrapper">
-                <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
-                    <div style="
-                        background-color: #2b2b2b;
-                        color: #f1f1f1;
-                        padding: 12px 16px;
-                        border-radius: 18px 18px 18px 4px;
-                        max-width: 70%;
-                        word-wrap: break-word;
-                        border: 1px solid #3d3d3d;
-                        font-size: 14px;
-                        line-height: 1.5;
-                    ">
-                        {safe_content}
-                    </div>
-                </div>
+        justify = "flex-start"
+        bubble_bg = "#2b2b2b"
+        bubble_border = "#3d3d3d"
+        bubble_radius = "18px 18px 18px 4px"
+        text_color = "#f1f1f1"
+        side_padding = "48px 99px 0 150px"
+
+    st.markdown(
+        f"""
+        <div style="
+            width: 100%;
+            display: flex;
+            justify-content: {justify};
+            padding: {side_padding};
+            box-sizing: border-box;
+        ">
+            <div style="
+                background-color: {bubble_bg};
+                color: {text_color};
+                padding: 15px 16px;
+                border-radius: {bubble_radius};
+                max-width: 100%;
+                border: 1px solid {bubble_border};
+                font-size: 14px;
+                line-height: 2.5;
+                word-wrap: break-word;
+            ">
+                {content}
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 
 
 def render_mode_banner():
@@ -117,8 +105,6 @@ def render_mode_banner():
             """,
             unsafe_allow_html=True,
         )
-
-# Styled document processing status (replace default spinner/success/error UI)
 
 def render_processing_banner(placeholder, text):
     placeholder.markdown(
