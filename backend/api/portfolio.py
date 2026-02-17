@@ -174,7 +174,6 @@ def portfolio_chat(
         llm = get_llm()
 
         if intent == "greeting":
-            print("Greeting")
             # ── Greeting: no retrieval ──
             chat_history_langchain = history_store.get_langchain_messages()
             prompt = ChatPromptTemplate.from_messages(
@@ -188,7 +187,6 @@ def portfolio_chat(
             result = chain.invoke({"message": message})
 
         elif intent == "followup":
-            print("followup")
 
             # ── Follow-up: use chat history, no retrieval ──
             chat_history_langchain = history_store.get_langchain_messages()
@@ -203,7 +201,6 @@ def portfolio_chat(
             result = chain.invoke({"message": message})
 
         else:
-            print("Rag")
 
             # ── Profile query: full RAG retrieval ──
             chat_history_langchain = history_store.get_langchain_messages()
