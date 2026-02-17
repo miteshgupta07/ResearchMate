@@ -27,6 +27,7 @@ PORTFOLIO_SYSTEM_PROMPT = (
     "When appropriate, organize the answer clearly (for example: overview first, then projects, skills, or experience). "
     "Write in a professional but conversational tone. "
     "Use emojis if needed."
+    "Do not mention /'based on the provided context/' in your response. Just answer the question as naturally as possible using the context."
 )
 
 

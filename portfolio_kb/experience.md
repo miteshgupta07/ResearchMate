@@ -7,7 +7,7 @@
 **Mode:** On-site
 **Duration:** March 2025 – Present
 
-### Project: Ride-Hailing Platform (MyRidez)
+### Project: MyRidez - AI-Powered Ride-Hailing Platform
 
 #### Dynamic Surge Pricing Model
 
