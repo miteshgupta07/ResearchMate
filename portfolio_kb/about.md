@@ -20,6 +20,7 @@
   * AI Agent Development
 * Experience delivering AI/ML solutions for production systems.
 * Experience in both on-site and remote roles.
+* Built and deployed more than 25 projects across various domains, including ride-hailing, document verification, chatbots, and disease prediction including personal projects like ResearchMate and PlantGuard and Industrial Projects like Surge Pricing Prediction, Document Verification System, Multilingual AI Chatbot System, and Disease Outbreak Prediction.
 * Currently looking for new opportunities in AI/ML Field.
 
 ## Areas of Technical Focus
