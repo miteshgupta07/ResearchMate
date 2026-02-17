@@ -3,7 +3,7 @@
 ## ResearchMate
 
 **Duration:** January 2025 – February 2025
-**Redesigned:** January 2026 – February 2026
+**Redesigned in:** January 2026 – February 2026
 **Skills & Tool:** AWS, Langchain, Streamlit, FastAPI, FAISS, RAG, PostgreSQL
 **Deployed on:** Deployed on AWS (https://researchmate.me/)
 **Github Repo:** https://github.com/miteshgupta07/ResearchMate
