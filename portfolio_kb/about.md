@@ -20,6 +20,7 @@
   * AI Agent Development
 * Experience delivering AI/ML solutions for production systems.
 * Experience in both on-site and remote roles.
+* Currently looking for new opportunities in AI/ML Field.
 
 ## Areas of Technical Focus
 
@@ -50,6 +51,7 @@
 * Production-grade AI systems
 * LLM applications
 * Applied machine learning in real-world environments
+* Favorite Project: ResearchMate, PlantGuard.
 
 
 ## Online Profiles

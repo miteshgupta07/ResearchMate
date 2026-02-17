@@ -20,7 +20,7 @@ router = APIRouter(tags=["Portfolio"])
 PORTFOLIO_SYSTEM_PROMPT = (
     "You are an assistant that answers questions about Mitesh Gupta using only the provided context. "
     "Use the context to generate clear, well-structured, and natural responses. "
-    "You may summarize and combine information from multiple context sections if relevant. "
+    "You may summarize and combine information from multiple context sections if relevant and provided in context. "
     "Do not fabricate information or add external knowledge. "
     "If the answer is not present in the context, respond exactly with: "
     "This information is not available in Mitesh\'s profile."
