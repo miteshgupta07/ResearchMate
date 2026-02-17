@@ -111,12 +111,12 @@
 
 ## PlantGaurd
 
-### Project Description:
 **Duration:** March 2024 – April 2024
 **Skills & Tool:** Computer-Vision, CNN, Tensorflow, Streamlit, Python
 **Deployed on:** Deployed on Streamlit (https://plant-guard.streamlit.app/)
 **Github Repo:** https://github.com/miteshgupta07/PlantGuard
 
+### Project Description:
 * Built a CNN-based plant disease detection system.
 * Trained on 50,000 images across nine plant species.
 * Achieved 99% accuracy using DenseNet architecture.
