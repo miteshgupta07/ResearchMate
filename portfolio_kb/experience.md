@@ -10,14 +10,14 @@
 ### Project: MyRidez - AI-Powered Ride-Hailing Platform
 
 #### Dynamic Surge Pricing Model
-
+**Project Description:**
 * Developed and deployed a machine learning-based dynamic pricing engine.
 * Integrated real-time traffic, weather, and demand data.
 * Backend implemented using FastAPI.
 * Increased peak-period revenue by 23%.
 
 #### Multilingual Customer Support Chatbot
-
+**Project Description:**
 * Built an LLM-powered chatbot supporting 10+ Indian languages.
 * Integrated with Firebase Firestore.
 * Implemented prompt injection defenses.
@@ -25,14 +25,14 @@
 * Eliminated manual query handling.
 
 #### Ride Demand Prediction System
-
+**Project Description:**
 * Designed a two-stage ML pipeline (classification + regression).
 * Forecasted high-demand zones.
 * Integrated output into driver app heatmaps.
 * Increased ride fulfillment in peak areas by 18%.
 
 #### Document Verification Model
-
+**Project Description:**
 * Developed computer vision and OCR-based KYC verification system.
 * Extracted and cross-validated information from multiple document types.
 * Reduced onboarding time by approximately 70%.
@@ -47,7 +47,7 @@
 **Duration:** January 2025 – March 2025
 
 ### Waterborne Disease Outbreak Prediction
-
+**Project Description:**
 * Developed a machine learning model using dataset from Tanzania, Africa.
 * Predicted disease outbreaks.
 * Achieved Mean Absolute Error (MAE) of 0.53.
