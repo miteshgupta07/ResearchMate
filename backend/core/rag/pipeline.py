@@ -162,7 +162,7 @@ def ingest_document(uploaded_file, original_filename: str = None) -> Tuple[str, 
     _save_metadata(document_id, original_filename, len(docs))
     
     # Get retriever
-    retriever = db.as_retriever()
+    retriever = db.as_retriever(search_kwargs={"k": 5})
     
     # Cache for session reuse
     _retriever_cache[cache_key] = (document_id, retriever)
@@ -203,7 +203,7 @@ def load_retriever(document_id: str) -> Optional[any]:
     )
     
     # Get retriever
-    retriever = db.as_retriever()
+    retriever = db.as_retriever(search_kwargs={"k": 5})
     
     # Cache for session reuse
     _retriever_cache[cache_key] = retriever

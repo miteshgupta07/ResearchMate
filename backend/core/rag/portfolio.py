@@ -62,6 +62,6 @@ def build_portfolio_retriever():
     embeddings = _get_embeddings()
     db = FAISS.from_documents(chunks, embeddings)
 
-    # Return retriever with top-3 results
-    retriever = db.as_retriever()
+    # Return retriever with top-10 results
+    retriever = db.as_retriever(search_kwargs={"k": 5})
     return retriever
