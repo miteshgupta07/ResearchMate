@@ -24,7 +24,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .api import chat, rag, documents, history, agent
+from .api.portfolio import router as portfolio_router
 from .core.llm import initialize_llm_registry, get_llm_registry
+from .core.rag.portfolio import build_portfolio_retriever
 
 
 # ============================================================================
@@ -47,7 +49,15 @@ async def lifespan(app: FastAPI):
     initialize_llm_registry()
     registry = get_llm_registry()
     print(f"[Startup] LLM Registry initialized with models: {registry.available_models}")
-    
+
+    # Startup: Build portfolio retriever from portfolio_kb/ markdown files
+    try:
+        app.state.portfolio_retriever = build_portfolio_retriever()
+        print("[Startup] Portfolio retriever initialized successfully")
+    except Exception as e:
+        print(f"[Startup] FATAL: Portfolio retriever initialization failed: {e}")
+        raise RuntimeError(f"Portfolio retriever initialization failed: {e}") from e
+
     yield
     
     # Shutdown: Cleanup (if needed)
@@ -99,6 +109,7 @@ app.include_router(rag.router)
 app.include_router(documents.router)
 app.include_router(history.router)
 app.include_router(agent.router)
+app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
 
 
 @app.get(
