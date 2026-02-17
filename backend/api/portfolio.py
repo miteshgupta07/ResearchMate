@@ -8,7 +8,7 @@ Fully isolated from the main RAG, agent, and chat routes.
 Uses the same PostgreSQL-backed chat history infrastructure.
 
 Includes structured LLM-based intent routing to avoid unnecessary
-retrieval for greetings, follow-up questions, and irrelevant queries.
+retrieval for greetings, follow-up questions.
 """
 
 from typing import Literal
@@ -31,7 +31,7 @@ router = APIRouter(tags=["Portfolio"])
 class IntentSchema(BaseModel):
     """Schema for structured intent classification output."""
 
-    intent: Literal["greeting", "followup", "profile_query", "irrelevant"]
+    intent: Literal["greeting", "followup", "profile_query"]
 
 
 # ============================================================================
@@ -62,22 +62,15 @@ PORTFOLIO_ROUTER_PROMPT = (
     "Classify the user message into one of the following categories:\n\n"
     "- greeting\n"
     "- followup\n"
-    "- profile_query\n"
-    "- irrelevant\n\n"
+    "- profile_query\n\n"
     "Definitions:\n"
     "- greeting: simple greetings, small talk, or thanks.\n"
     "- followup: short references to previous response.\n"
     "- profile_query: questions about Mitesh Gupta's experience, skills, projects, education, or background.\n"
-    "- irrelevant: questions unrelated to Mitesh Gupta or his profile "
     "(e.g., general knowledge, politics, weather, math, coding problems).\n\n"
     "Respond strictly using the defined schema."
 )
 
-IRRELEVANT_RESPONSE = (
-    "I'm designed to answer questions specifically about Mitesh Gupta's "
-    "background, experience, and projects. Let me know if you'd like to "
-    "know more about his work."
-)
 
 
 # ============================================================================
@@ -97,7 +90,7 @@ def classify_intent(message: str) -> str:
         message: The user's message text.
 
     Returns:
-        One of 'greeting', 'followup', 'profile_query', or 'irrelevant'.
+        One of 'greeting', 'followup', 'profile_query'.
     """
     try:
         llm = get_llm(temperature=0, max_tokens=10)
@@ -134,7 +127,6 @@ def portfolio_chat(
        - greeting:       respond without retrieval.
        - followup:       respond using chat history, no retrieval.
        - profile_query:  retrieve context and generate RAG response.
-       - irrelevant:     return controlled response, no retrieval.
     4. Persists messages to history.
     5. Returns the response.
     """
@@ -164,11 +156,6 @@ def portfolio_chat(
 
         # Classify intent using structured output
         intent = classify_intent(message)
-
-        if intent == "irrelevant":
-            # ── Irrelevant: no retrieval, controlled response ──
-            history_store.add_message("assistant", IRRELEVANT_RESPONSE)
-            return PortfolioChatResponse(response=IRRELEVANT_RESPONSE)
 
         # Get default LLM for response generation
         llm = get_llm()
