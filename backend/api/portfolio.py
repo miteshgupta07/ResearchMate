@@ -6,16 +6,37 @@ about Mitesh Gupta using pre-ingested portfolio knowledge-base documents.
 
 Fully isolated from the main RAG, agent, and chat routes.
 Uses the same PostgreSQL-backed chat history infrastructure.
+
+Includes structured LLM-based intent routing to avoid unnecessary
+retrieval for greetings, follow-up questions, and irrelevant queries.
 """
+
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel
 
 from ..schemas.portfolio import PortfolioChatRequest, PortfolioChatResponse
 from ..core.deps import get_chat_history_store, get_llm
 from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(tags=["Portfolio"])
+
+# ============================================================================
+# STRUCTURED INTENT SCHEMA
+# ============================================================================
+
+
+class IntentSchema(BaseModel):
+    """Schema for structured intent classification output."""
+
+    intent: Literal["greeting", "followup", "profile_query", "irrelevant"]
+
+
+# ============================================================================
+# SYSTEM PROMPTS
+# ============================================================================
 
 PORTFOLIO_SYSTEM_PROMPT = (
     "You are an assistant that answers questions about Mitesh Gupta using only the provided context. "
@@ -30,6 +51,68 @@ PORTFOLIO_SYSTEM_PROMPT = (
     "Do not mention /'based on the provided context/' in your response. Just answer the question as naturally as possible using the context."
 )
 
+GREETING_SYSTEM_PROMPT = (
+    "You are an assistant representing Mitesh Gupta. "
+    "Respond naturally and professionally to greetings or small talk. "
+    "Keep responses short and friendly."
+)
+
+PORTFOLIO_ROUTER_PROMPT = (
+    "You are a classifier.\n\n"
+    "Classify the user message into one of the following categories:\n\n"
+    "- greeting\n"
+    "- followup\n"
+    "- profile_query\n"
+    "- irrelevant\n\n"
+    "Definitions:\n"
+    "- greeting: simple greetings, small talk, or thanks.\n"
+    "- followup: short references to previous response.\n"
+    "- profile_query: questions about Mitesh Gupta's experience, skills, projects, education, or background.\n"
+    "- irrelevant: questions unrelated to Mitesh Gupta or his profile "
+    "(e.g., general knowledge, politics, weather, math, coding problems).\n\n"
+    "Respond strictly using the defined schema."
+)
+
+IRRELEVANT_RESPONSE = (
+    "I'm designed to answer questions specifically about Mitesh Gupta's "
+    "background, experience, and projects. Let me know if you'd like to "
+    "know more about his work."
+)
+
+
+# ============================================================================
+# INTENT CLASSIFIER
+# ============================================================================
+
+
+def classify_intent(message: str) -> str:
+    """
+    Classify a user message using structured LLM output.
+
+    Uses a lightweight LLM call with temperature=0 and structured output
+    enforced via Pydantic schema (IntentSchema). Falls back to
+    'profile_query' on unexpected output or errors.
+
+    Args:
+        message: The user's message text.
+
+    Returns:
+        One of 'greeting', 'followup', 'profile_query', or 'irrelevant'.
+    """
+    try:
+        llm = get_llm(temperature=0, max_tokens=10)
+        structured_llm = llm.with_structured_output(IntentSchema)
+        prompt = f"{PORTFOLIO_ROUTER_PROMPT}\n\nUser message: {message}"
+        result: IntentSchema = structured_llm.invoke(prompt)
+        return result.intent
+    except Exception:
+        return "profile_query"
+
+
+# ============================================================================
+# ENDPOINT
+# ============================================================================
+
 
 @router.post(
     "/chat",
@@ -43,15 +126,17 @@ def portfolio_chat(
     history_store: PostgresChatHistoryStore = Depends(get_chat_history_store),
 ) -> PortfolioChatResponse:
     """
-    Handle a portfolio chat query with persistent history.
+    Handle a portfolio chat query with persistent history and intent routing.
 
     1. Validates request (session_id and message).
-    2. Sets session context and adds user message to history.
-    3. Retrieves top-3 context chunks from the portfolio retriever.
-    4. Builds a prompt with portfolio system instruction, context, and chat history.
-    5. Calls the default LLM.
-    6. Persists assistant response to history.
-    7. Returns the response.
+    2. Classifies intent via structured LLM call.
+    3. Routes to appropriate handler:
+       - greeting:       respond without retrieval.
+       - followup:       respond using chat history, no retrieval.
+       - profile_query:  retrieve context and generate RAG response.
+       - irrelevant:     return controlled response, no retrieval.
+    4. Persists messages to history.
+    5. Returns the response.
     """
     # Validate session_id
     if not request.session_id or not request.session_id.strip():
@@ -69,37 +154,73 @@ def portfolio_chat(
             detail="Portfolio retriever is not initialized.",
         )
 
+    message = request.message.strip()
+    session_id = request.session_id.strip()
+
     try:
-        # Set session context
-        history_store.set_session(request.session_id.strip())
+        # Set session context and persist user message
+        history_store.set_session(session_id)
+        history_store.add_message("user", message)
 
-        # Add user message to history
-        history_store.add_message("user", request.message.strip())
+        # Classify intent using structured output
+        intent = classify_intent(message)
 
-        # Get chat history in LangChain format
-        chat_history_langchain = history_store.get_langchain_messages()
+        if intent == "irrelevant":
+            # ── Irrelevant: no retrieval, controlled response ──
+            history_store.add_message("assistant", IRRELEVANT_RESPONSE)
+            return PortfolioChatResponse(response=IRRELEVANT_RESPONSE)
 
-        # Retrieve top-3 relevant chunks
-        context_docs = retriever.invoke(request.message.strip())
-        context_text = "\n\n".join(doc.page_content for doc in context_docs)
-
-        # Build prompt including chat history
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", PORTFOLIO_SYSTEM_PROMPT),
-                *chat_history_langchain[:-1],  # prior turns (exclude current user msg)
-                ("human", "Context:\n{context}\n\nQuestion: {question}"),
-            ]
-        )
-
-        # Get default LLM (no dynamic model selection)
+        # Get default LLM for response generation
         llm = get_llm()
 
-        # Generate response
-        chain = prompt | llm
-        result = chain.invoke({"context": context_text, "question": request.message.strip()})
+        if intent == "greeting":
+            print("Greeting")
+            # ── Greeting: no retrieval ──
+            chat_history_langchain = history_store.get_langchain_messages()
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", GREETING_SYSTEM_PROMPT),
+                    *chat_history_langchain[:-1],
+                    ("human", "{message}"),
+                ]
+            )
+            chain = prompt | llm
+            result = chain.invoke({"message": message})
 
-        # Persist assistant response to history
+        elif intent == "followup":
+            print("followup")
+
+            # ── Follow-up: use chat history, no retrieval ──
+            chat_history_langchain = history_store.get_langchain_messages()
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", PORTFOLIO_SYSTEM_PROMPT),
+                    *chat_history_langchain[:-1],
+                    ("human", "{message}"),
+                ]
+            )
+            chain = prompt | llm
+            result = chain.invoke({"message": message})
+
+        else:
+            print("Rag")
+
+            # ── Profile query: full RAG retrieval ──
+            chat_history_langchain = history_store.get_langchain_messages()
+            context_docs = retriever.invoke(message)
+            context_text = "\n\n".join(doc.page_content for doc in context_docs)
+
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", PORTFOLIO_SYSTEM_PROMPT),
+                    *chat_history_langchain[:-1],
+                    ("human", "Context:\n{context}\n\nQuestion: {question}"),
+                ]
+            )
+            chain = prompt | llm
+            result = chain.invoke({"context": context_text, "question": message})
+
+        # Persist assistant response
         history_store.add_message("assistant", result.content)
 
         return PortfolioChatResponse(response=result.content)

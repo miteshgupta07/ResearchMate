@@ -62,5 +62,5 @@ def build_portfolio_retriever():
     embeddings = _get_embeddings()
     db = FAISS.from_documents(chunks, embeddings)
 
-    retriever = db.as_retriever()
+    retriever = db.as_retriever(search_kwargs={"k": 5})
     return retriever
