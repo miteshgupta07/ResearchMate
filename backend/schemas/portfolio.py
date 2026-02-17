@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 
 class PortfolioChatRequest(BaseModel):
+    session_id: str
     message: str
 
 

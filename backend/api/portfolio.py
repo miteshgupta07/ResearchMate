@@ -5,14 +5,15 @@ Provides the /portfolio/chat endpoint for answering questions
 about Mitesh Gupta using pre-ingested portfolio knowledge-base documents.
 
 Fully isolated from the main RAG, agent, and chat routes.
+Uses the same PostgreSQL-backed chat history infrastructure.
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import HumanMessage
 
 from ..schemas.portfolio import PortfolioChatRequest, PortfolioChatResponse
-from ..core.deps import get_llm
+from ..core.deps import get_chat_history_store, get_llm
+from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(tags=["Portfolio"])
 
@@ -35,16 +36,26 @@ PORTFOLIO_SYSTEM_PROMPT = (
     summary="Chat about Mitesh Gupta's portfolio",
     description="Ask a question about Mitesh Gupta. Answers are grounded in pre-ingested portfolio documents.",
 )
-def portfolio_chat(request: PortfolioChatRequest, req: Request) -> PortfolioChatResponse:
+def portfolio_chat(
+    request: PortfolioChatRequest,
+    req: Request,
+    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store),
+) -> PortfolioChatResponse:
     """
-    Handle a portfolio chat query.
+    Handle a portfolio chat query with persistent history.
 
-    1. Validates the message is not empty.
-    2. Retrieves top-3 context chunks from the portfolio retriever.
-    3. Builds a prompt with the portfolio system instruction and context.
-    4. Calls the default LLM via the existing service.
-    5. Returns the response.
+    1. Validates request (session_id and message).
+    2. Sets session context and adds user message to history.
+    3. Retrieves top-3 context chunks from the portfolio retriever.
+    4. Builds a prompt with portfolio system instruction, context, and chat history.
+    5. Calls the default LLM.
+    6. Persists assistant response to history.
+    7. Returns the response.
     """
+    # Validate session_id
+    if not request.session_id or not request.session_id.strip():
+        raise HTTPException(status_code=400, detail="session_id must not be empty.")
+
     # Validate non-empty message
     if not request.message or not request.message.strip():
         raise HTTPException(status_code=422, detail="Message must not be empty.")
@@ -58,13 +69,24 @@ def portfolio_chat(request: PortfolioChatRequest, req: Request) -> PortfolioChat
         )
 
     try:
+        # Set session context
+        history_store.set_session(request.session_id.strip())
+
+        # Add user message to history
+        history_store.add_message("user", request.message.strip())
+
+        # Get chat history in LangChain format
+        chat_history_langchain = history_store.get_langchain_messages()
+
         # Retrieve top-3 relevant chunks
         context_docs = retriever.invoke(request.message.strip())
         context_text = "\n\n".join(doc.page_content for doc in context_docs)
-        # Build prompt
+
+        # Build prompt including chat history
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", PORTFOLIO_SYSTEM_PROMPT),
+                *chat_history_langchain[:-1],  # prior turns (exclude current user msg)
                 ("human", "Context:\n{context}\n\nQuestion: {question}"),
             ]
         )
@@ -75,6 +97,9 @@ def portfolio_chat(request: PortfolioChatRequest, req: Request) -> PortfolioChat
         # Generate response
         chain = prompt | llm
         result = chain.invoke({"context": context_text, "question": request.message.strip()})
+
+        # Persist assistant response to history
+        history_store.add_message("assistant", result.content)
 
         return PortfolioChatResponse(response=result.content)
 
