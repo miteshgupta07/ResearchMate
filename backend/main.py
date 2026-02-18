@@ -88,9 +88,9 @@ This backend acts as a **transport layer** that:
 - Maintains session isolation for chat history
     """,
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
 )
 
 # Configure CORS middleware
@@ -128,8 +128,7 @@ def root():
     return {
         "name": "ResearchMate API",
         "version": "1.0.0",
-        "status": "healthy",
-        "docs": "/docs"
+        "status": "healthy"
     }
 
 
