@@ -80,7 +80,7 @@ class RAGEvaluator:
         """Get or create embeddings model (same as production)."""
         if self._embeddings is None:
             from langchain_huggingface import HuggingFaceEmbeddings
-            self._embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            self._embeddings = HuggingFaceEmbeddings(model_name="intfloat/e5-base-v2")
         return self._embeddings
     
     def build_vectorstore(self) -> None:

@@ -84,7 +84,7 @@ def prechecks(message: str, document_id: Optional[str]) -> Optional[Tuple[str, f
             return (INTENT_CHAT, 1.0)
     
     # Rule 2: Very short messages (less than 5 characters) → INTENT_CHAT
-    if len(message_lower) < 5:
+    if len(message_lower) < 4:
         return (INTENT_CHAT, 1.0)
     
     # Rule 3: Single word messages that are generic → INTENT_CHAT
@@ -107,7 +107,7 @@ ALLOWED INTENTS:
 - INTENT_CHAT: General conversation, greetings, or questions not requiring document/paper search
 - INTENT_RAG_QA: Questions about a specific uploaded document (requires document context)
 - INTENT_RAG_SUMMARY: Request to summarize an uploaded document (requires document context)
-- INTENT_ARXIV_SEARCH: Request to search for academic papers on arXiv
+- INTENT_ARXIV_SEARCH: Request to search for academic papers on arXiv or query is related to finding papers (e.g., "find papers about X", "search for research on Y")
 - INTENT_ARXIV_RECOMMEND: Request for paper recommendations based on a topic
 
 CONTEXT:
