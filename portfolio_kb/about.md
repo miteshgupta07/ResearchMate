@@ -18,6 +18,7 @@
   * Natural Language Processing
   * Generative AI
   * AI Agent Development
+
 * Experience delivering AI/ML solutions for production systems.
 * Experience in both on-site and remote roles.
 * Built and deployed more than 25 projects across various domains, including ride-hailing, document verification, chatbots, and disease prediction including personal projects like ResearchMate and PlantGuard and Industrial Projects like Surge Pricing Prediction, Document Verification System, Multilingual AI Chatbot System, and Disease Outbreak Prediction.
@@ -55,9 +56,9 @@
 * Favorite Project: ResearchMate, PlantGuard.
 
 
-## Online Profiles
+## Contact Information and Online Profiles
 
-* Gmail:  miteshgupta2711@gmail.com
+* Gmail: miteshgupta2711@gmail.com
 * LinkedIn: https://www.linkedin.com/in/mitesh-gupta/
 * GitHub: https://github.com/miteshgupta07
 * Kaggle: https://www.kaggle.com/mgmitesh
