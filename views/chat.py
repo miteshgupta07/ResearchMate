@@ -4,7 +4,16 @@
 import html
 import uuid
 import streamlit as st
-from frontend.css import render_message, render_mode_banner, render_processing_banner, render_generating_banner, render_success_banner, render_error_banner
+from frontend.css import (
+    load_responsive_css,
+    load_chat_input_css,
+    render_message,
+    render_mode_banner,
+    render_processing_banner,
+    render_generating_banner,
+    render_success_banner,
+    render_error_banner
+)
 # Import API client for backend communication
 from frontend.api_client import (
     send_chat_message,
@@ -16,38 +25,9 @@ from frontend.api_client import (
     APIError
 )
 
-# Scoped CSS for layout customization
-st.markdown(
-    """
-    <style>
-    :root {
-        --chat-max-width: 750px;
-    }
-    .block-container {
-        padding-left: 10rem;
-        padding-right: 10rem;
-        max-width: 1400px;
-    }
-    .content-wrapper {
-        margin: 0 auto;
-    }
-    .chat-wrapper {
-        max-width: var(--chat-max-width);
-        margin: 0 auto;
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    section[data-testid="stChatInput"] {
-        max-width: var(--chat-max-width);
-        margin-left: 0;
-        margin-right: 0;
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# Load responsive CSS once at startup
+load_responsive_css()
+load_chat_input_css()
 
 # Generate a unique session ID for this user session
 if "session_id" not in st.session_state:
@@ -72,7 +52,7 @@ with st.sidebar:
             help="When enabled, your queries will be processed by the AI agent which can perform complex research tasks."
         )
         st.session_state.agent_enabled = agent_enabled
-        
+
         if agent_enabled:
             st.info("Agent Mode is ON. Your queries will be routed to the agent for advanced processing.")
         else:
@@ -80,7 +60,11 @@ with st.sidebar:
 
     # File uploader for PDF documents (RAG functionality)
     with st.expander("**Attach a Document**", icon="📎"):
-        uploaded_file=st.file_uploader("Upload a pdf",type=["pdf"], help="Upload a PDF document to enable Retrieval-Augmented Generation (RAG) mode. The AI will use the content of the uploaded document to answer your queries more accurately.")
+        uploaded_file = st.file_uploader(
+            "Upload a pdf",
+            type=["pdf"],
+            help="Upload a PDF document to enable Retrieval-Augmented Generation (RAG) mode. The AI will use the content of the uploaded document to answer your queries more accurately."
+        )
 
     # Adding a dropdown for language selection to support multilingual capabilities
     with st.expander("**Language Options**", icon="🌐"):
@@ -103,7 +87,7 @@ with st.sidebar:
             "Gemma2 9B": "Gemma2 is a large-scale language model with 9 billion parameters, known for its ability to generate highly coherent, contextually accurate, and nuanced text. It is suited for applications that require creative content generation, such as dialogue systems, storytelling, and more.",
             "Mixtral": "Mixtral is a multi-modal AI model optimized for both text and image processing. This model integrates visual and textual information to enable tasks like image captioning, text-to-image generation, and interactive storytelling, offering a creative approach to AI applications."
         }
-        
+
         # Displaying detailed descriptions for each model based on user selection
         st.session_state.model = model_type
         st.markdown(f"**Selected Model:** {model_type}", help=model_desc[model_type])
@@ -124,7 +108,7 @@ with st.sidebar:
             help="Controls the maximum number of tokens the model can generate in its response. Higher values allow for longer responses.",
         )
 
-    
+
 # Displaying a greeting message based on the selected language
 greetings = {
     "English": "Hi! How can I assist you today?",
@@ -144,30 +128,28 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Mode indicator banner (replace st.caption usage)
-
-# Call this where you previously used st.caption(...)
+# Mode indicator banner
 render_mode_banner()
 
 # Process the uploaded document via API (Only when a new file is uploaded)
 if uploaded_file:
     if "uploaded_file_name" not in st.session_state or st.session_state.uploaded_file_name != uploaded_file.name:
         st.session_state.uploaded_file_name = uploaded_file.name
-        
+
         status_placeholder = st.empty()
         render_processing_banner(status_placeholder, "Processing document…")
-        
+
         try:
             result = upload_document(uploaded_file)
             st.session_state.document_id = result["document_id"]
             status_placeholder.empty()
-            
+
             success_placeholder = st.empty()
             render_success_banner(success_placeholder, "Document processed successfully!")
         except APIError as e:
             st.session_state.document_id = None
             status_placeholder.empty()
-            
+
             error_placeholder = st.empty()
             render_error_banner(error_placeholder, f"Failed to upload document: {e.message}")
 
@@ -233,15 +215,15 @@ if user_input:
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-        
+
         status_placeholder.empty()
-        
+
         # Display assistant's response
         render_message("assistant", result.get("content", ""))
-                
+
     except APIError as e:
         status_placeholder.empty()
-        
+
         error_placeholder = st.empty()
         render_error_banner(error_placeholder, f"Failed to generate response: {e.message}")
 
