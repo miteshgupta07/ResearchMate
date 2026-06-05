@@ -1,0 +1,32 @@
+name: Deploy ResearchMate
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Deploy it')
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/ResearchMate
+
+            git fetch origin
+            git reset --hard origin/main
+
+            source venv/bin/activate
+
+            sudo systemctl restart researchmate_backend
+            sudo systemctl restart researchmate_frontend
