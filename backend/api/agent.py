@@ -343,6 +343,12 @@ def _extract_search_query(message: str) -> str:
         "find",
         "look for",
         "search",
+        "tell me about",
+        "what about",
+        "explain",
+        "research on",
+        "papers on",
+        "about",
     ]
     
     query = message.lower().strip()
