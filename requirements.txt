@@ -19,3 +19,4 @@ psycopg2==2.9.11
 
 # CI/CD dependencies
 ruff==0.15.18
+pytest==9.1.1
