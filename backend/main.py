@@ -87,7 +87,7 @@ This backend acts as a **transport layer** that:
 - Calls existing core logic directly (no duplication)
 - Maintains session isolation for chat history
     """,
-    version="2.1.0",
+    version="2.1.1",
     docs_url=None,
     redoc_url=None,
     openapi_url=None
@@ -127,7 +127,7 @@ def root():
     """
     return {
         "name": "ResearchMate API",
-        "version": "2.1.0",
+        "version": "2.1.1",
         "status": "healthy"
     }
 
