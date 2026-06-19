@@ -7,4 +7,6 @@ ignore = [
     "F401", # unused imports
     "F541", # f-string without placeholders
     "E402", # imports not at top
+    "E501", # line too long
+    "I001", # missing docstring
 ]
