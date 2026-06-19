@@ -75,3 +75,13 @@ jobs:
 
             sudo systemctl restart researchmate_backend
             sudo systemctl restart researchmate_frontend
+
+            sleep 30
+
+      - name: Smoke Test Backend
+        run: |
+          curl --fail https://api.researchmate.me/health
+
+      - name: Smoke Test Frontend
+        run: |
+          curl --fail https://researchmate.me
