@@ -45,10 +45,12 @@ def get_llm(
     Defaults are applied inside the LLM service layer:
     - temperature: 0.7
     - max_tokens: 512
-    - model: llama-3.1-8b-instant
+    - model: openai/gpt-oss-20b
+
+
     
     Args:
-        model_type: Frontend model name (e.g. "LLaMA 3.1-8B")
+        model_type: Frontend model name (e.g. "GPT OSS")
         temperature: Controls randomness in responses (0.0-1.0)
         max_tokens: Maximum tokens in generated response
     

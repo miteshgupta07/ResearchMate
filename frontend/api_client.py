@@ -36,7 +36,7 @@ def send_chat_message(
         session_id: Unique session identifier
         message: The user's message
         language: Target language for the response
-        model_type: Frontend model name (e.g. 'LLaMA 3.1-8B')
+        model_type: Frontend model name (e.g. 'GPT OSS')
         temperature: Temperature for response generation (0.0-1.0)
         max_tokens: Maximum tokens in generated response
     
@@ -81,7 +81,7 @@ def send_rag_query(
         document_id: The ID of the document to query against
         message: The user's query
         language: Target language for the response
-        model_type: Frontend model name (e.g. 'LLaMA 3.1-8B')
+        model_type: Frontend model name (e.g. 'GPT OSS')
         temperature: Temperature for response generation (0.0-1.0)
         max_tokens: Maximum tokens in generated response
     
@@ -206,7 +206,7 @@ def send_agent_message(
         message: The user's message
         document_id: Optional document ID for RAG context
         language: Target language for the response
-        model_type: Frontend model name (e.g. 'LLaMA 3.1-8B')
+        model_type: Frontend model name (e.g. 'GPT OSS')
         temperature: Temperature for response generation (0.0-1.0)
         max_tokens: Maximum tokens in generated response
     

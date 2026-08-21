@@ -31,7 +31,7 @@ class AgentRequest(BaseModel):
     )
     model_type: Optional[str] = Field(
         default=None,
-        description="Frontend model name (e.g. 'LLaMA 3.1-8B')"
+        description="Frontend model name (e.g. 'GPT OSS')"
     )
     temperature: Optional[float] = Field(
         default=None,
@@ -53,7 +53,7 @@ class AgentRequest(BaseModel):
                     "message": "What is machine learning?",
                     "document_id": None,
                     "language": "English",
-                    "model_type": "LLaMA 3.1-8B",
+                    "model_type": "GPT OSS",
                     "temperature": 0.7,
                     "max_tokens": 512
                 }

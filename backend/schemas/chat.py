@@ -27,7 +27,7 @@ class ChatRequest(BaseModel):
     )
     model_type: Optional[str] = Field(
         default=None,
-        description="Frontend model name (e.g. 'LLaMA 3.1-8B')"
+        description="Frontend model name (e.g. 'GPT OSS')"
     )
     temperature: Optional[float] = Field(
         default=None,
@@ -48,7 +48,7 @@ class ChatRequest(BaseModel):
                     "session_id": "user-123-session-1",
                     "message": "What is machine learning?",
                     "language": "English",
-                    "model_type": "LLaMA 3.1-8B",
+                    "model_type": "GPT OSS",
                     "temperature": 0.7,
                     "max_tokens": 512
                 }

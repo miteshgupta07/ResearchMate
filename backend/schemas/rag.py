@@ -32,7 +32,7 @@ class RAGQueryRequest(BaseModel):
     )
     model_type: Optional[str] = Field(
         default=None,
-        description="Frontend model name (e.g. 'LLaMA 3.1-8B')"
+        description="Frontend model name (e.g. 'GPT OSS')"
     )
     temperature: Optional[float] = Field(
         default=None,
@@ -54,7 +54,7 @@ class RAGQueryRequest(BaseModel):
                     "document_id": "7c3421af-5fa1-47c7-8555-6b763e06d666",
                     "message": "What are the main findings of this paper?",
                     "language": "English",
-                    "model_type": "LLaMA 3.1-8B",
+                    "model_type": "GPT OSS",
                     "temperature": 0.7,
                     "max_tokens": 512
                 }

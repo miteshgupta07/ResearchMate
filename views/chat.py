@@ -79,11 +79,11 @@ with st.sidebar:
         # Allowing the user to select the model type for generating responses
         model_type = st.selectbox(
             "**Choose model type**",
-            ["LLaMA 3.1-8B", "Gemma2 9B", "Mixtral"],
+            ["GPT OSS"],
             help="Select the model type you want to use for generating responses. Each model has different strengths and use cases.",
         )
         model_desc = {
-            "LLaMA 3.1-8B": "LLaMA (Large Language Model Meta AI) 3.1-8B is a versatile language model developed by Meta, featuring 8 billion parameters. It excels in a variety of natural language processing tasks such as text generation, summarization, and translation, while maintaining efficiency and reliability in performance.",
+            "GPT OSS": "GPT OSS is an open-source language model developed by OpenAI, featuring advanced natural language understanding and generation capabilities. It excels in a variety of tasks such as text generation, summarization, and translation, while maintaining efficiency and reliability in performance.",
             "Gemma2 9B": "Gemma2 is a large-scale language model with 9 billion parameters, known for its ability to generate highly coherent, contextually accurate, and nuanced text. It is suited for applications that require creative content generation, such as dialogue systems, storytelling, and more.",
             "Mixtral": "Mixtral is a multi-modal AI model optimized for both text and image processing. This model integrates visual and textual information to enable tasks like image captioning, text-to-image generation, and interactive storytelling, offering a creative approach to AI applications."
         }

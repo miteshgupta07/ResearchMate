@@ -163,7 +163,7 @@ class RAGEvaluator:
             # Import production LLM configuration
             from backend.core.llm import create_llm
             self._llm = create_llm(
-                model_name="llama-3.1-8b-instant",
+                model_name="openai/gpt-oss-20b",
                 temperature=0.7,
                 max_tokens=512
             )
