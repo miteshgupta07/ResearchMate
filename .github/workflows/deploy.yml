@@ -80,8 +80,30 @@ jobs:
 
       - name: Smoke Test Backend
         run: |
-          curl --fail https://api.researchmate.me/health
+          for i in {1..12}; do
+            if curl --fail --silent --show-error https://api.researchmate.me/health; then
+              echo "Backend is healthy."
+              exit 0
+            fi
+
+            echo "Backend is not ready yet. Retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "Backend failed to become healthy."
+          exit 1
 
       - name: Smoke Test Frontend
         run: |
-          curl --fail https://researchmate.me
+          for i in {1..12}; do
+            if curl --fail --silent --show-error https://researchmate.me; then
+              echo "Frontend is healthy."
+              exit 0
+            fi
+
+            echo "Frontend is not ready yet. Retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "Frontend failed to become healthy."
+          exit 1
