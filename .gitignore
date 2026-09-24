@@ -4,6 +4,10 @@ __pycache__/
 *$py.class
 *.pdf
 data/
+
+# Resume files
+!resume/**
+
 # C extensions
 *.so
 Upgrade.md
