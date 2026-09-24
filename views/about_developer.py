@@ -26,9 +26,9 @@ st.markdown(
 # Introduction Section
 st.header("👋 Introduction")
 st.write("""
-Hi, I’m Mitesh Gupta—an AI Engineer focused on building real-world, scalable intelligence.
-I work across machine learning, deep learning, generative AI, and NLP to turn complex ideas into production-ready systems.
-Explore my work to see how I approach modern AI problems.
+Hi, I’m Mitesh Gupta an AI Engineer with strong expertise in Machine Learning, Deep Learning, NLP, and Generative AI.
+Experienced in building and deploying scalable AI solutions and backend systems using Python and FastAPI.
+Skilled in end-to-end model development, data processing, API design, and cloud deployment. Adept at translating complex business problems into practical, production-ready AI applications.
 """)
 import streamlit as st
 
@@ -77,28 +77,31 @@ with col2:
     st.write("**Or**")
 
 with col3:
-    st.link_button(
-        "Download My Resume",
-        "https://drive.google.com/file/d/1DNFjKVUIK0V2l98ituAnhNNQ70IIpIsj/view?usp=sharing",
-        icon="📄"
-    )
+    with open("resume/Mitesh Gupta Resume-September 2026.pdf", "rb") as file:
+        st.download_button(
+            label="Download My Resume",
+            data=file,
+            file_name="Mitesh Gupta Resume.pdf",
+            mime="application/pdf",
+            icon="📄"
+        )
 
 
 # Skills Section
 st.header("🚀 Skills")
 st.markdown("""
 
-- **Programming & Data Foundations:** Python, Data Science, Pandas, NumPy
+- **Data Science & AI:** Python, Machine Learning, Deep Learning, CV, NLP, Generative AI, Feature Engineering, Model Optimization 
 
-- **Machine Learning & Deep Learning:** Machine Learning, Deep Learning, Scikit-learn, TensorFlow, Keras, PyTorch
+- **MLOps & Deployment:** AWS, Docker, Kubernetes , MLflow, FastAPI , Model Versioning, CI/CD Pipelines, Hugging Face, LLM Evaluation 
 
-- **AI Specializations:** Generative AI, Natural Language Processing (NLP), Computer Vision, Retrieval-Augmented Generation (RAG) Systems
+- **LLM & Agent Frameworks:** MCP, LangGraph, LangChain, TensorFlow, Keras, PyTorch , Scikit-learn, OpenCV, NLTK, spaCy, Streamlit 
 
-- **Frameworks & NLP Tooling:** LangChain, NLTK, spaCy, OpenCV
+- **Data Analysis & Visualization:** Data Preprocessing, Data Visualization, Data Analysis, SQL, Pandas, NumPy 
 
-- **Cloud, MLOps & Deployment:** AWS, Docker, MLflow, CI/CD Pipelines, Streamlit, Groq, Hugging Face
+- **Databases & Vector Stores:** MySQL, PostgreSQL, Chroma, FAISS 
 
-- **Databases & Vector Stores:** MySQL, Vector Databases: ChromaDB, FAISS
+- **Version Control & Tools:** Git, GitHub 
 """)
 
 # Interests Section
