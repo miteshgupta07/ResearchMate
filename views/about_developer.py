@@ -77,7 +77,7 @@ with col2:
     st.write("**Or**")
 
 with col3:
-    with open("resume/Mitesh Gupta Resume-September 2026.pdf", "rb") as file:
+    with open("resume/Mitesh Gupta Resume-October 2026.pdf", "rb") as file:
         st.download_button(
             label="Download My Resume",
             data=file,
