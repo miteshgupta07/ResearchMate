@@ -1,35 +1,42 @@
-import { useId } from 'react'
+﻿import { useRef } from 'react'
 import { useSession } from '../../app/session/SessionContext'
 
-export function PdfUpload({ disabled = false }: { disabled?: boolean }) {
-  const id = useId()
-  const { documentUpload, selectDocument, removeDocument } = useSession()
+export function PdfAttachmentButton({ disabled = false }: { disabled?: boolean }) {
+  const pickerRef = useRef<HTMLInputElement>(null)
+  const { documentUpload, selectDocument } = useSession()
+  const busy = documentUpload.status === 'uploading' || documentUpload.status === 'processing'
+  const label = documentUpload.document ? 'Replace PDF attachment' : 'Attach a PDF'
+  return (
+    <>
+      <input ref={pickerRef} type="file" hidden accept=".pdf,application/pdf" disabled={disabled || busy} onChange={(event) => {
+        const file = event.target.files?.[0]
+        event.target.value = ''
+        if (file && !disabled && !busy) selectDocument(file)
+      }} />
+      <button type="button" aria-label={label} title={label} disabled={disabled || busy} onClick={() => pickerRef.current?.click()} className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink focus-visible:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40">
+        <span aria-hidden="true" className="text-2xl font-light leading-none">+</span>
+      </button>
+    </>
+  )
+}
+
+export function PdfAttachmentStatus({ disabled = false }: { disabled?: boolean }) {
+  const { documentUpload, removeDocument } = useSession()
   const busy = documentUpload.status === 'uploading' || documentUpload.status === 'processing'
   const filename = documentUpload.document?.filename ?? documentUpload.filename
-
+  if (!filename && !documentUpload.error) return null
   return (
-    <section aria-label="PDF attachment" className="mx-auto w-full max-w-3xl px-6 pt-3 sm:px-10">
-      <div className="rounded-xl border border-line bg-surface/40 px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="min-w-0 flex-1 break-words text-sm text-ink [overflow-wrap:anywhere]">{filename ?? 'Attach a PDF'}</p>
-          <div className="flex items-center gap-3">
-            <label htmlFor={id} className="sr-only">{documentUpload.document ? 'Replace PDF' : 'Choose PDF'}</label>
-            <input id={id} type="file" accept=".pdf,application/pdf" disabled={disabled || busy} aria-describedby={`${id}-status ${id}-help`} onChange={(event) => {
-              const file = event.target.files?.[0]
-              // Clear the picker so a failed or same-name file can be selected again.
-              event.target.value = ''
-              if (file && !disabled) selectDocument(file)
-            }} className="min-h-11 w-full max-w-56 text-xs text-muted file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border file:border-line file:bg-surface file:px-3 file:text-xs file:text-ink disabled:opacity-50" />
-            {(filename || busy) && <button type="button" onClick={removeDocument} disabled={disabled} className="min-h-11 rounded-lg px-2 text-xs text-accent hover:bg-accent/10 disabled:opacity-50">{busy ? 'Cancel upload' : 'Remove'}</button>}
-          </div>
+    <div className="px-2 pt-1">
+      {filename && (
+        <div className="flex max-w-full items-center gap-2 rounded-xl bg-canvas/70 pl-3 pr-1 text-xs">
+          <span aria-hidden="true" className="shrink-0 text-accent">PDF</span>
+          <span title={filename} className="min-w-0 flex-1 truncate text-ink/90">{filename}</span>
+          <span role="status" className="shrink-0 text-muted">{busy ? 'Processing…' : documentUpload.document ? 'Ready' : 'Failed'}</span>
+          <button type="button" onClick={removeDocument} disabled={disabled} aria-label={busy ? 'Cancel PDF upload' : 'Remove PDF attachment'} title={busy ? 'Cancel upload' : 'Detach PDF (server file retained)'} className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:text-accent focus-visible:bg-accent/20 disabled:opacity-40"><span aria-hidden="true" className="text-lg">×</span></button>
         </div>
-        <p id={`${id}-status`} role={documentUpload.error ? 'alert' : 'status'} aria-live={documentUpload.error ? 'assertive' : 'polite'} className={`mt-1 text-xs leading-5 ${documentUpload.error ? 'text-accent' : 'text-muted'}`}>
-          {documentUpload.error ?? (documentUpload.status === 'uploading' ? 'Sending PDF…'
-            : documentUpload.status === 'processing' ? 'Uploading and processing PDF…'
-              : documentUpload.document ? 'PDF processed and attached. Ask a question about this document.' : 'Choose a non-empty PDF to prepare a document.')}
-        </p>
-        <p id={`${id}-help`} className="mt-1 text-[11px] leading-5 text-muted">Removing a PDF detaches it from this session. Server files are retained.</p>
-      </div>
-    </section>
+      )}
+      {documentUpload.error && <p role="alert" className="px-1 pt-1 text-xs leading-5 text-accent">{documentUpload.error}</p>}
+      <span className="sr-only">Removing an attachment detaches it locally. Server files are retained.</span>
+    </div>
   )
 }

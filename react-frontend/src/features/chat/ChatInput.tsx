@@ -1,24 +1,58 @@
-import { useId, useState } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { resizeChatInput, shouldSendOnEnter } from './chatLayout'
+import { PdfAttachmentButton, PdfAttachmentStatus } from '../documents/PdfUpload'
+import { AgentModeToggle } from '../settings/AgentModeToggle'
 
-export function ChatInput({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => boolean }) {
+export function ChatInput({ disabled, controlsDisabled = false, onSend }: { disabled: boolean; controlsDisabled?: boolean; onSend: (text: string) => boolean }) {
   const [draft, setDraft] = useState('')
   const id = useId()
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    if (textareaRef.current) resizeChatInput(textareaRef.current)
+  }, [draft])
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    let previousWidth = textarea.clientWidth
+    const resize = () => resizeChatInput(textarea)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      if (textarea.clientWidth !== previousWidth) {
+        previousWidth = textarea.clientWidth
+        resize()
+      }
+    })
+    observer?.observe(textarea)
+    window.addEventListener('resize', resize)
+    window.visualViewport?.addEventListener('resize', resize)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', resize)
+      window.visualViewport?.removeEventListener('resize', resize)
+    }
+  }, [])
   const send = () => {
     if (!disabled && draft.trim() && onSend(draft)) setDraft('')
   }
   return (
-    <form aria-label="Send a chat message" onSubmit={(event) => { event.preventDefault(); send() }} className="mx-auto w-full max-w-3xl px-6 pb-4 pt-3 sm:px-10">
+    <form aria-label="Send a chat message" onSubmit={(event) => { event.preventDefault(); send() }} className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-10">
       <label htmlFor={id} className="sr-only">Message</label>
-      <div className="flex items-end gap-3 rounded-2xl border border-line bg-surface p-3 focus-within:border-accent/60">
-        <textarea id={id} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={disabled} rows={2} placeholder="Ask a question…" aria-describedby={`${id}-help`} onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
+      <div className="chat-composer flex min-w-0 flex-col rounded-3xl border border-line bg-surface p-2 transition-colors focus-within:border-accent/50">
+        <PdfAttachmentStatus disabled={controlsDisabled} />
+        <textarea ref={textareaRef} id={id} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={disabled} rows={1} placeholder="Ask a question…" aria-describedby={`${id}-help`} onKeyDown={(event) => {
+          if (shouldSendOnEnter({ key: event.key, shiftKey: event.shiftKey, isComposing: event.nativeEvent.isComposing, keyCode: event.nativeEvent.keyCode })) {
             event.preventDefault()
             send()
           }
-        }} className="max-h-48 min-h-12 min-w-0 flex-1 resize-y bg-transparent px-1 py-2 text-sm leading-6 text-ink outline-none placeholder:text-muted disabled:opacity-50" />
-        <button type="submit" disabled={disabled || !draft.trim()} className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-sm font-semibold text-sidebar transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">Send</button>
+        }} className="chat-scrollbar min-h-10 max-h-[min(12rem,30dvh,calc(var(--workspace-height,100dvh)*0.25))] w-full min-w-0 shrink-0 resize-none border-0 bg-transparent px-3 py-2 text-base leading-6 text-ink outline-none placeholder:text-muted focus-visible:outline-none disabled:opacity-50 sm:text-sm" />
+        <div className="flex shrink-0 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <PdfAttachmentButton disabled={controlsDisabled} />
+            <AgentModeToggle />
+          </div>
+          <button type="submit" disabled={disabled || !draft.trim()} aria-label="Send message" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-sidebar transition-colors hover:bg-ink focus-visible:bg-ink disabled:cursor-not-allowed disabled:opacity-40"><span aria-hidden="true" className="text-xl">↑</span></button>
+        </div>
       </div>
-      <p id={`${id}-help`} className="mt-2 text-center text-[11px] text-muted">Enter to send · Shift+Enter for a new line</p>
+      <p id={`${id}-help`} className="sr-only">Enter to send. Shift+Enter for a new line.</p>
     </form>
   )
 }

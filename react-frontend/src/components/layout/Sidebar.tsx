@@ -14,7 +14,7 @@ export function Sidebar({ collapsed = false, onNavigate, onToggle, mobile = fals
   const toggleLabel = mobile ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto p-3">
+    <div className="chat-scrollbar flex h-full flex-col overflow-y-auto p-3">
       <div className={`flex min-h-16 shrink-0 items-center gap-2 ${collapsed ? 'flex-col py-2' : 'justify-between px-2'}`}>
         <Link to="/" onClick={onNavigate} aria-label="ResearchMate home" className="flex items-center gap-2.5 rounded-lg">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent"><Icon name="spark" className="size-6" /></span>

@@ -8,7 +8,13 @@ export interface BrowserSession {
   settings: ChatSettings
 }
 
-const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+/** One closure per loaded JS page; no storage restoration, including in StrictMode. */
+export function createPageSessionId(createId = () => crypto.randomUUID()): () => string {
+  let id: string | undefined
+  return () => { id ??= createId(); return id }
+}
+
+const pageSessionId = createPageSessionId()
 
 export function getSessionStorage(): Storage | null {
   try {
@@ -20,16 +26,16 @@ export function getSessionStorage(): Storage | null {
 
 export function saveSession(storage: Storage | null, session: BrowserSession): void {
   try {
-    // Explicit allowlist: no documents, messages, files, credentials, or arbitrary keys.
+    // Only settings survive refresh. IDs, documents and messages stay in memory.
     storage?.setItem(SESSION_STORAGE_KEY, JSON.stringify({
-      session_id: session.session_id, settings: normalizeSettings(session.settings),
+      settings: normalizeSettings(session.settings),
     }))
   } catch {
     // Storage may be disabled or full; the current React session stays usable.
   }
 }
 
-export function loadSession(storage: Storage | null, createId = () => crypto.randomUUID()): BrowserSession {
+export function loadSession(storage: Storage | null, createId = pageSessionId): BrowserSession {
   let data: Record<string, unknown> = {}
   try {
     const parsed: unknown = JSON.parse(storage?.getItem(SESSION_STORAGE_KEY) ?? 'null')
@@ -40,10 +46,10 @@ export function loadSession(storage: Storage | null, createId = () => crypto.ran
     // Invalid JSON and blocked storage both fall back to a fresh session.
   }
   const session = {
-    session_id: typeof data.session_id === 'string' && UUID_V4.test(data.session_id) ? data.session_id : createId(),
+    session_id: createId(),
     settings: normalizeSettings(data.settings),
   }
-  // Save the UUID immediately so StrictMode's repeated initializer reuses it.
+  // Rewrite legacy snapshots without the old session ID while retaining settings.
   saveSession(storage, session)
   return session
 }

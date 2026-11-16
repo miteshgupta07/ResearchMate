@@ -4,8 +4,10 @@ import { navigation } from '../../app/navigation'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { ModeIndicator } from '../../features/settings/ModeIndicator'
+import { useWorkspaceViewport } from './useWorkspaceViewport'
 
 export function AppLayout() {
+  const workspaceRef = useWorkspaceViewport()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const drawerRef = useRef<HTMLDialogElement>(null)
@@ -13,6 +15,7 @@ export function AppLayout() {
   const { pathname } = useLocation()
   const previousPath = useRef(pathname)
   const title = navigation.find((item) => item.path === pathname)?.label ?? 'ResearchMate'
+  const isChat = pathname === '/'
 
   useEffect(() => {
     document.title = `${title} · ResearchMate`
@@ -44,7 +47,7 @@ export function AppLayout() {
   }, [mobileOpen])
 
   return (
-    <div className="flex h-dvh min-h-0 overflow-hidden bg-canvas">
+    <div ref={workspaceRef} className="group/workspace fixed inset-x-0 top-[var(--workspace-top,0px)] flex h-[var(--workspace-height,100dvh)] min-h-0 overflow-hidden bg-canvas">
       <a href="#main-content" className="sr-only fixed top-3 left-3 z-50 rounded-lg bg-ink px-4 py-3 text-sm font-medium text-sidebar focus:not-sr-only">Skip to content</a>
       <aside aria-label="Sidebar" className={`hidden shrink-0 border-r border-line/50 bg-sidebar md:block ${collapsed ? 'w-20' : 'w-64'}`}>
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
@@ -53,11 +56,11 @@ export function AppLayout() {
         <Sidebar mobile onToggle={() => setMobileOpen(false)} onNavigate={() => setMobileOpen(false)} />
       </dialog>
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header title={title} mobileOpen={mobileOpen} onOpenNavigation={() => setMobileOpen(true)} />
-        <main ref={mainRef} id="main-content" tabIndex={-1} aria-label={title} className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none">
-          <ModeIndicator />
-          <Outlet />
-          <footer className="mt-auto px-6 py-6 text-center text-[11px] tracking-wide text-muted">ResearchMate <span aria-hidden="true" className="px-1.5">·</span> A space to explore ideas</footer>
+        {!isChat && <Header title={title} mobileOpen={mobileOpen} onOpenNavigation={() => setMobileOpen(true)} />}
+        <main ref={mainRef} id="main-content" tabIndex={-1} aria-label={title} className={`flex min-h-0 flex-1 flex-col outline-none focus-visible:outline-none ${isChat ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          {!isChat && <div className="shrink-0"><ModeIndicator /></div>}
+          <Outlet context={{ chatHeader: <><Header title={title} mobileOpen={mobileOpen} onOpenNavigation={() => setMobileOpen(true)} /><ModeIndicator /></> }} />
+          {!isChat && <footer className="mt-auto shrink-0 px-6 py-6 text-center text-[11px] tracking-wide text-muted">ResearchMate <span aria-hidden="true" className="px-1.5">·</span> A space to explore ideas</footer>}
         </main>
       </div>
     </div>

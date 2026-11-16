@@ -1,28 +1,24 @@
 import { useLayoutEffect, useRef } from 'react'
+import { createScrollFollower } from './chatLayout'
 
 export function useChatScroll(update: unknown) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
-  const following = useRef(true)
-
-  const scrollIfFollowing = () => {
-    const viewport = viewportRef.current
-    if (viewport && following.current) viewport.scrollTop = viewport.scrollHeight
-  }
-  useLayoutEffect(scrollIfFollowing, [update])
+  const followerRef = useRef<ReturnType<typeof createScrollFollower> | null>(null)
   useLayoutEffect(() => {
-    if (typeof ResizeObserver === 'undefined' || !contentRef.current) return
-    const observer = new ResizeObserver(scrollIfFollowing)
-    observer.observe(contentRef.current)
-    return () => observer.disconnect()
+    const follower = createScrollFollower(() => viewportRef.current)
+    followerRef.current = follower
+    follower.update()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(follower.update)
+    if (contentRef.current) observer?.observe(contentRef.current)
+    if (viewportRef.current) observer?.observe(viewportRef.current)
+    return () => { observer?.disconnect(); followerRef.current = null }
   }, [])
+  useLayoutEffect(() => { followerRef.current?.update() }, [update])
 
   return {
     viewportRef, contentRef,
-    followLatest: () => { following.current = true },
-    onScroll: () => {
-      const viewport = viewportRef.current
-      if (viewport) following.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80
-    },
+    followLatest: () => { followerRef.current?.followLatest() },
+    onScroll: () => { followerRef.current?.onScroll() },
   }
 }

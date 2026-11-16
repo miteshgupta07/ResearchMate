@@ -13,13 +13,6 @@ export function SettingsPanel() {
       <summary className="cursor-pointer rounded-sm py-2 font-medium text-ink/90">Chat settings</summary>
       <div className="mt-4 space-y-5">
         <div>
-          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3" htmlFor={`${id}-agent`}>
-            <span>Agent mode</span>
-            <input id={`${id}-agent`} type="checkbox" role="switch" checked={settings.agent_enabled} onChange={(event) => updateSettings({ agent_enabled: event.target.checked })} aria-describedby={`${id}-agent-help`} className="size-5 shrink-0 accent-accent" />
-          </label>
-          <p id={`${id}-agent-help`} className="text-xs leading-5 text-muted">{settings.agent_enabled ? 'Advanced research mode selected.' : 'Use normal chat or document Q&A.'}</p>
-        </div>
-        <div>
           <label htmlFor={`${id}-language`} className="text-muted">Language</label>
           <select id={`${id}-language`} value={settings.language} onChange={(event) => { if (isLanguage(event.target.value)) updateSettings({ language: event.target.value }) }} className={selectClass}>
             {LANGUAGES.map((language) => <option key={language} value={language}>{language}</option>)}
