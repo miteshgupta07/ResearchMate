@@ -8,6 +8,10 @@ data/
 # Resume files
 !resume/**
 
+# Documentation files
+AGENTS.md
+REACT_MIGRATION_PLAN.md
+
 # C extensions
 *.so
 Upgrade.md
