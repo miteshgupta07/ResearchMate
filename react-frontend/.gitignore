@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Keep the downloadable resume in the independently built frontend.
+!public/resume/*.pdf
