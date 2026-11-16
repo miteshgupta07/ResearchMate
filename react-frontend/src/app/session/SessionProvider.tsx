@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { getChatMode, normalizeSettings, WELCOME_MESSAGES } from '../../features/settings/model.ts'
 import type { ChatSettings } from '../../features/settings/model.ts'
 import { SessionContext } from './SessionContext.ts'
 import { getSessionStorage, loadSession, saveSession } from './storage.ts'
+import { createDocumentStore } from '../../features/documents/documentStore.ts'
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState(() => loadSession(getSessionStorage()))
-  // Future uploads set this only after successful processing. Never persist it.
-  const [documentId, setDocumentId] = useState<string | null>(null)
+  const [documents] = useState(() => createDocumentStore())
+  const documentUpload = useSyncExternalStore(documents.subscribe, documents.getSnapshot, documents.getSnapshot)
+  const documentId = documentUpload.document?.document_id ?? null
+
+  useEffect(() => documents.remove, [documents, session.session_id])
 
   useEffect(() => {
     saveSession(getSessionStorage(), session)
@@ -23,11 +27,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     ...session,
     document_id: documentId,
-    setDocumentId,
+    setDocumentId: documents.setDocumentId,
+    documentUpload,
+    selectDocument: documents.select,
+    removeDocument: documents.remove,
     updateSettings,
     mode: getChatMode(session.settings.agent_enabled, documentId),
     welcomeMessage: WELCOME_MESSAGES[session.settings.language],
-  }), [session, documentId, updateSettings])
+  }), [session, documentId, documentUpload, documents, updateSettings])
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
 }
