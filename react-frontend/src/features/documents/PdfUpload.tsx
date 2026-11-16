@@ -26,7 +26,7 @@ export function PdfUpload({ disabled = false }: { disabled?: boolean }) {
         <p id={`${id}-status`} role={documentUpload.error ? 'alert' : 'status'} aria-live={documentUpload.error ? 'assertive' : 'polite'} className={`mt-1 text-xs leading-5 ${documentUpload.error ? 'text-accent' : 'text-muted'}`}>
           {documentUpload.error ?? (documentUpload.status === 'uploading' ? 'Sending PDF…'
             : documentUpload.status === 'processing' ? 'Uploading and processing PDF…'
-              : documentUpload.document ? 'PDF processed and attached. Document Q&A is coming in a future update.' : 'Choose a non-empty PDF to prepare a document.')}
+              : documentUpload.document ? 'PDF processed and attached. Ask a question about this document.' : 'Choose a non-empty PDF to prepare a document.')}
         </p>
         <p id={`${id}-help`} className="mt-1 text-[11px] leading-5 text-muted">Removing a PDF detaches it from this session. Server files are retained.</p>
       </div>
