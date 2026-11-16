@@ -1,6 +1,7 @@
 import { Link, NavLink } from 'react-router'
 import { navigation } from '../../app/navigation'
 import { Icon } from '../ui/Icon'
+import { SettingsPanel } from '../../features/settings/SettingsPanel'
 
 type SidebarProps = {
   collapsed?: boolean
@@ -24,7 +25,7 @@ export function Sidebar({ collapsed = false, onNavigate, onToggle, mobile = fals
         </button>
       </div>
 
-      <nav id={mobile ? 'mobile-navigation' : 'desktop-navigation'} aria-label="Main navigation" className="mt-8 mb-8">
+      <nav id={mobile ? 'mobile-navigation' : 'desktop-navigation'} aria-label="Main navigation" className="mt-8 mb-8 shrink-0">
         <p className={`mb-3 px-3 text-[10px] font-semibold tracking-[0.18em] text-muted ${collapsed ? 'sr-only' : ''}`}>WORKSPACE</p>
         <ul className="space-y-1.5">
           {navigation.map(({ path, label, icon }) => (
@@ -43,7 +44,13 @@ export function Sidebar({ collapsed = false, onNavigate, onToggle, mobile = fals
         </ul>
       </nav>
 
-      <div className={`mt-auto border-t border-line/70 pt-5 pb-3 ${collapsed ? 'text-center' : 'px-3'}`}>
+      {collapsed ? (
+        <button type="button" onClick={onToggle} aria-label="Expand sidebar to chat settings" title="Chat settings" className="mb-6 flex min-h-11 items-center justify-center rounded-lg text-muted hover:bg-surface hover:text-ink">
+          <Icon name="settings" />
+        </button>
+      ) : <SettingsPanel />}
+
+      <div className={`mt-auto shrink-0 border-t border-line/70 pt-5 pb-3 ${collapsed ? 'text-center' : 'px-3'}`}>
         {collapsed ? <span title="ResearchMate" className="text-xs font-semibold text-muted">RM</span> : (
           <>
             <p className="text-xs font-medium text-ink/80">A place for curious minds.</p>

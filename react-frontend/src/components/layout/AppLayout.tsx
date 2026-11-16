@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router'
 import { navigation } from '../../app/navigation'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
+import { ModeIndicator } from '../../features/settings/ModeIndicator'
 
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
@@ -54,6 +55,7 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header title={title} mobileOpen={mobileOpen} onOpenNavigation={() => setMobileOpen(true)} />
         <main ref={mainRef} id="main-content" tabIndex={-1} aria-label={title} className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none">
+          <ModeIndicator />
           <Outlet />
           <footer className="mt-auto px-6 py-6 text-center text-[11px] tracking-wide text-muted">ResearchMate <span aria-hidden="true" className="px-1.5">·</span> A space to explore ideas</footer>
         </main>
