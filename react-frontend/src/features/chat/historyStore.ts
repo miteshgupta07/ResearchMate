@@ -6,7 +6,7 @@ import type { HistoryResponse, MessageItem } from '../../types/api.ts'
 /** Local identity for a persisted snapshot; future pending messages stay separate. */
 export interface ChatMessage extends MessageItem {
   id: string
-  source: 'history'
+  source: 'history' | 'local'
 }
 
 export interface HistoryState {

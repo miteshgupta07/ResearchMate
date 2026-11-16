@@ -11,7 +11,7 @@ interface ChatHistoryViewProps {
 
 export function ChatHistoryView({ history, onRetry, welcomeMessage, languageCode }: ChatHistoryViewProps) {
   if (history.status === 'success' && history.messages.length === 0) {
-    return <PagePlaceholder icon="spark" eyebrow="YOUR RESEARCH WORKSPACE" title="Chat" description={welcomeMessage} descriptionLang={languageCode} note="Your conversation will appear here. Chat submission and document tools are coming in a future update." />
+    return <PagePlaceholder icon="spark" eyebrow="YOUR RESEARCH WORKSPACE" title="Chat" description={welcomeMessage} descriptionLang={languageCode} note="Ask a question to start your conversation." />
   }
 
   if (history.status === 'loading' || history.status === 'error') {
