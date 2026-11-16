@@ -34,7 +34,7 @@ export function ChatInput({ disabled, controlsDisabled = false, onSend }: { disa
     if (!disabled && draft.trim() && onSend(draft)) setDraft('')
   }
   return (
-    <form aria-label="Send a chat message" onSubmit={(event) => { event.preventDefault(); send() }} className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-10">
+    <form aria-label="Send a chat message" onSubmit={(event) => { event.preventDefault(); send() }} className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-2 sm:px-10">
       <label htmlFor={id} className="sr-only">Message</label>
       <div className="chat-composer flex min-w-0 flex-col rounded-3xl border border-line bg-surface p-2 transition-colors focus-within:border-accent/50">
         <PdfAttachmentStatus disabled={controlsDisabled} />
