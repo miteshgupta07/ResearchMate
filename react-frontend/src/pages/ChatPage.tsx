@@ -10,9 +10,9 @@ export function ChatPage() {
   const { session_id, settings, document_id, documentUpload, welcomeMessage } = useSession()
   const chat = useChat(session_id)
   const { viewportRef, contentRef, onScroll, followLatest } = useChatScroll(chat.messages)
-  const normalMode = !settings.agent_enabled && !document_id
+  const supportedMode = !settings.agent_enabled
   const uploadPending = documentUpload.status === 'uploading' || documentUpload.status === 'processing'
-  const disabled = !normalMode || uploadPending || chat.status !== 'success' || chat.sending || chat.reconciling || Boolean(chat.syncError)
+  const disabled = !supportedMode || uploadPending || chat.status !== 'success' || chat.sending || chat.reconciling || Boolean(chat.syncError)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -29,10 +29,10 @@ export function ChatPage() {
           {chat.syncError && <button type="button" disabled={chat.reconciling} onClick={() => { void chat.retry() }} className="mt-2 min-h-11 rounded-lg border border-accent/30 px-3 disabled:opacity-50">Check history</button>}
         </div>
       )}
-      {!normalMode && <p className="px-6 pt-3 text-center text-xs text-muted">Normal chat is available with Agent mode off and no document attached. Other chat modes are coming later.</p>}
+      {!supportedMode && <p className="px-6 pt-3 text-center text-xs text-muted">Turn off Agent mode to use normal chat or document Q&A. Agent execution is coming later.</p>}
       <PdfUpload disabled={chat.sending || chat.reconciling} />
       <ChatInput key={session_id} disabled={disabled} onSend={(text) => {
-        if (!normalMode || uploadPending || !chat.submit(text, settings)) return false
+        if (!supportedMode || uploadPending || !chat.submit(text, settings, document_id)) return false
         followLatest()
         return true
       }} />
