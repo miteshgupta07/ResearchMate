@@ -1,8 +1,8 @@
 import { createHistoryStore } from './historyStore.ts'
 import type { ChatMessage, HistoryState } from './historyStore.ts'
-import { sendChatMessage } from '../../services/api/chat.ts'
+import { sendChatMessage, sendRagQuery } from '../../services/api/chat.ts'
 import { ApiError } from '../../services/api/errors.ts'
-import type { ChatRequest, ChatResponse, GenerationOptions, MessageItem } from '../../types/api.ts'
+import type { ChatRequest, ChatResponse, GenerationOptions, MessageItem, RAGQueryRequest, RAGQueryResponse } from '../../types/api.ts'
 import type { RequestOptions } from '../../services/api/client.ts'
 
 export interface ChatState extends HistoryState {
@@ -13,10 +13,14 @@ export interface ChatState extends HistoryState {
 }
 
 type Sender = (request: ChatRequest, options: RequestOptions) => Promise<ChatResponse>
+type RagSender = (request: RAGQueryRequest, options: RequestOptions) => Promise<RAGQueryResponse>
 type HistoryStore = ReturnType<typeof createHistoryStore>
 
-function sendErrorMessage(error: unknown): string {
+function sendErrorMessage(error: unknown, documentQuery: boolean): string {
   if (error instanceof ApiError) {
+    if (documentQuery && (error.status === 404 || error.validationErrors.some((issue) => issue.loc.includes('document_id')))) {
+      return 'This document is unavailable or invalid. Remove it or upload the PDF again before asking another document question.'
+    }
     if (error.kind === 'timeout') return 'The response timed out. Your message may have been saved.'
     if (error.kind === 'network') return 'The connection failed. Your message may have been saved.'
     if (error.kind === 'configuration') return 'Chat is unavailable. Check VITE_API_BASE_URL.'
@@ -28,7 +32,7 @@ function sendErrorMessage(error: unknown): string {
 const sameMessage = (a: MessageItem, b: MessageItem) => a.role === b.role && a.content === b.content
 
 /** Serializes POST + history reconciliation. No automatic retries of a POST. */
-export function createChatStore(sessionId: string, history: HistoryStore = createHistoryStore(sessionId), sender: Sender = sendChatMessage) {
+export function createChatStore(sessionId: string, history: HistoryStore = createHistoryStore(sessionId), sender: Sender = sendChatMessage, ragSender: RagSender = sendRagQuery) {
   let state: ChatState = { ...history.getSnapshot(), sending: false, reconciling: false, sendError: null, syncError: null }
   let confirmed: ChatMessage[] = []
   let local: ChatMessage[] = []
@@ -98,9 +102,13 @@ export function createChatStore(sessionId: string, history: HistoryStore = creat
     }
   }
 
-  const submit = (text: string, settings: GenerationOptions): boolean => {
+  const submit = (text: string, settings: GenerationOptions & { agent_enabled?: boolean }, documentId: string | null = null): boolean => {
     const content = text.trim()
-    if (!content || busy || state.status !== 'success' || state.syncError) return false
+    if (!content || busy || state.status !== 'success' || state.syncError || settings.agent_enabled) return false
+    if (documentId !== null && (typeof documentId !== 'string' || !documentId.trim())) {
+      publish({ sendError: 'The document ID is missing or invalid. Remove the attachment or upload the PDF again.' })
+      return false
+    }
     busy = true
     const token = ++generation
     controller = new AbortController()
@@ -108,14 +116,16 @@ export function createChatStore(sessionId: string, history: HistoryStore = creat
     local = [{ id: `${sessionId}:local:${++sequence}`, source: 'local', role: 'user', content }]
     postSucceeded = false
     publish({ messages: [...confirmed, ...local], sending: true, sendError: null, syncError: null })
-    // Capture only generation settings; no agent/document fields enter POST /chat.
+    // Capture settings and document selection for this turn; never reroute in flight.
     const request: ChatRequest = {
       session_id: sessionId, message: content, language: settings.language,
       model_type: settings.model_type, temperature: settings.temperature, max_tokens: settings.max_tokens,
     }
     void (async () => {
       try {
-        const response = await sender(request, { signal })
+        const response = documentId === null
+          ? await sender(request, { signal })
+          : await ragSender({ ...request, document_id: documentId }, { signal })
         if (generation !== token) return
         if (response?.role !== 'assistant' || typeof response.content !== 'string') throw new Error('Invalid chat response')
         local = [...local, { id: `${sessionId}:local:${++sequence}`, source: 'local', role: 'assistant', content: response.content }]
@@ -123,7 +133,7 @@ export function createChatStore(sessionId: string, history: HistoryStore = creat
         publish({ messages: [...confirmed, ...local] })
       } catch (error) {
         if (generation !== token) return
-        publish({ sendError: sendErrorMessage(error) })
+        publish({ sendError: sendErrorMessage(error, documentId !== null) })
       }
       if (generation !== token) return
       publish({ sending: false, reconciling: true })
