@@ -28,6 +28,11 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
 ::selection { background: #ee9b8840; color: #fff; }
 
+.settings-dropdown-trigger:focus, .settings-dropdown-trigger:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
 .chat-composer :focus-visible { outline: none; }
 .chat-scrollbar { scrollbar-width: thin; scrollbar-color: #55514e transparent; }
 .chat-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }

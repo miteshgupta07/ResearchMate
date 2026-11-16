@@ -4,8 +4,7 @@ import { isLanguage, LANGUAGES } from './model'
 import { Icon } from '../../components/ui/Icon'
 import { SettingHelp } from './SettingHelp'
 import { ResetGenerationSettings } from './ResetGenerationSettings'
-
-const selectClass = 'mt-2 min-h-11 w-full cursor-pointer rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors hover:border-muted/60 focus:border-accent/60 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 [&>option]:bg-surface [&>option]:text-ink'
+import { SettingsDropdown } from '../../components/ui/SettingsDropdown'
 
 export function SettingsPanel() {
   const id = useId()
@@ -16,16 +15,12 @@ export function SettingsPanel() {
       <summary className="cursor-pointer rounded-sm py-2 font-medium text-ink/90"><span className="inline-flex items-center gap-2 align-middle">Chat settings<Icon name="settings" className="size-4 text-muted" /></span></summary>
       <div className="mt-4 space-y-5">
         <div>
-          <div className="flex items-center justify-between gap-2"><label htmlFor={`${id}-language`} className="text-muted">Language</label><SettingHelp setting="Language">Choose the language for the welcome message and AI answers.</SettingHelp></div>
-          <select id={`${id}-language`} value={settings.language} onChange={(event) => { if (isLanguage(event.target.value)) updateSettings({ language: event.target.value }) }} className={selectClass}>
-            {LANGUAGES.map((language) => <option key={language} value={language}>{language}</option>)}
-          </select>
+          <div className="flex items-center justify-between gap-2"><label id={`${id}-language-label`} htmlFor={`${id}-language`} className="text-muted">Language</label><SettingHelp setting="Language">Choose the language for the welcome message and AI answers.</SettingHelp></div>
+          <SettingsDropdown id={`${id}-language`} labelId={`${id}-language-label`} value={settings.language} options={LANGUAGES} onChange={(language) => { if (isLanguage(language)) updateSettings({ language }) }} />
         </div>
         <div>
-          <div className="flex items-center justify-between gap-2"><label htmlFor={`${id}-model`} className="text-muted">Model</label><SettingHelp setting="Model">The AI model that answers your questions. GPT OSS is currently available.</SettingHelp></div>
-          <select id={`${id}-model`} value={settings.model_type} onChange={() => updateSettings({ model_type: 'GPT OSS' })} className={selectClass} aria-describedby={`${id}-model-help`}>
-            <option value="GPT OSS">GPT OSS</option>
-          </select>
+          <div className="flex items-center justify-between gap-2"><label id={`${id}-model-label`} htmlFor={`${id}-model`} className="text-muted">Model</label><SettingHelp setting="Model">The AI model that answers your questions. GPT OSS is currently available.</SettingHelp></div>
+          <SettingsDropdown id={`${id}-model`} labelId={`${id}-model-label`} descriptionId={`${id}-model-help`} value={settings.model_type} options={['GPT OSS'] as const} onChange={() => updateSettings({ model_type: 'GPT OSS' })} />
           <p id={`${id}-model-help`} className="mt-2 text-xs leading-5 text-muted">The available language model.</p>
         </div>
         <div>
