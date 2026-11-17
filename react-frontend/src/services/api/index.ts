@@ -1,0 +1,7 @@
+export { sendChatMessage, sendRagQuery, sendAgentMessage } from './chat.ts'
+export { uploadDocument } from './documents.ts'
+export { getChatHistory, clearChatHistory } from './history.ts'
+export { checkBackendHealth } from './health.ts'
+export { ApiError } from './errors.ts'
+export type { ApiErrorKind } from './errors.ts'
+export type { RequestOptions } from './client.ts'
