@@ -27,10 +27,8 @@ jobs:
       - name: Run Ruff
         run: ruff check .
 
-
   test:
     needs: lint
-
     runs-on: ubuntu-latest
 
     steps:
@@ -47,9 +45,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Tests
-        run: |
-          pytest -v
-
+        run: pytest -v
 
   deploy:
     needs: [lint, test]
@@ -65,45 +61,63 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 15m
           script: |
+            set -e
+
             cd ~/ResearchMate
 
             git fetch origin
             git reset --hard origin/main
 
-            source venv/bin/activate
+            # Build React frontend
+            cd react-frontend
 
+            test -f .env || {
+              echo "React .env file is missing."
+              exit 1
+            }
+
+            npm ci
+            npm run build
+
+            # Publish React production files
+            sudo mkdir -p /var/www/researchmate
+            sudo rsync -a --delete dist/ /var/www/researchmate/
+            sudo chown -R www-data:www-data /var/www/researchmate
+
+            # Restart FastAPI backend
             sudo systemctl restart researchmate_backend
-            sudo systemctl restart researchmate_frontend
 
-            sleep 30
+            # Validate Nginx
+            sudo nginx -t
 
       - name: Smoke Test Backend
         run: |
           for i in {1..12}; do
-            if curl --fail --silent --show-error https://api.researchmate.me/health; then
+            if curl --fail --silent --show-error --max-time 10 https://api.researchmate.me/health; then
               echo "Backend is healthy."
               exit 0
             fi
 
-            echo "Backend is not ready yet. Retrying in 5 seconds..."
+            echo "Backend not ready. Retrying in 5 seconds..."
             sleep 5
           done
 
-          echo "Backend failed to become healthy."
+          echo "Backend health check failed."
           exit 1
 
       - name: Smoke Test Frontend
         run: |
           for i in {1..12}; do
-            if curl --fail --silent --show-error https://researchmate.me; then
-              echo "Frontend is healthy."
+            if curl --fail --silent --show-error --max-time 10 https://researchmate.me/ > /dev/null; then
+              echo "React frontend is reachable."
               exit 0
             fi
 
-            echo "Frontend is not ready yet. Retrying in 5 seconds..."
+            echo "Frontend not ready. Retrying in 5 seconds..."
             sleep 5
           done
 
-          echo "Frontend failed to become healthy."
+          echo "Frontend health check failed."
           exit 1
