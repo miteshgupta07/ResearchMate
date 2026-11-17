@@ -25,7 +25,7 @@ const contactLinks = [
 ]
 
 export function AboutDeveloperPage() {
-  const resumeUrl = `${import.meta.env?.BASE_URL ?? '/'}resume/${encodeURIComponent('Mitesh Gupta Resume-October 2026.pdf')}`
+  const resumeUrl = `${import.meta.env?.BASE_URL ?? '/'}resume/${encodeURIComponent('Mitesh Gupta Resume.pdf')}`
   return (
     <article className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
       <header className="border-b border-line pb-10">
