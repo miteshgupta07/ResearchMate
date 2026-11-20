@@ -7,12 +7,38 @@ import { ModeIndicator } from '../../features/settings/ModeIndicator'
 import { useWorkspaceViewport } from './useWorkspaceViewport'
 import { OpeningSplash } from '../ui/OpeningSplash'
 
+const SIDEBAR_STATE_KEY = 'researchmate.sidebar.collapsed.v1'
+const SIDEBAR_AUTO_EXPANSION_KEY = 'researchmate.sidebar.auto-expansion.completed.v1'
+
+function loadSidebarSession() {
+  try {
+    const savedState = window.sessionStorage.getItem(SIDEBAR_STATE_KEY)
+    return {
+      collapsed: savedState !== 'false',
+      // A refresh during the entrance should also preserve the saved state.
+      autoExpansionComplete: window.sessionStorage.getItem(SIDEBAR_AUTO_EXPANSION_KEY) === 'true'
+        || savedState === 'true' || savedState === 'false',
+    }
+  } catch {
+    return { collapsed: true, autoExpansionComplete: false }
+  }
+}
+
+function saveSidebarValue(key: string, value: boolean) {
+  try {
+    window.sessionStorage.setItem(key, String(value))
+  } catch {
+    // Keep the sidebar usable in memory when tab storage is unavailable.
+  }
+}
+
 export function AppLayout() {
   const workspaceRef = useWorkspaceViewport()
-  const [collapsed, setCollapsed] = useState(true)
+  const [initialSidebar] = useState(loadSidebarSession)
+  const [collapsed, setCollapsed] = useState(initialSidebar.collapsed)
   const [splashComplete, setSplashComplete] = useState(false)
   const autoExpandTimer = useRef<number | undefined>(undefined)
-  const autoExpandCancelled = useRef(false)
+  const autoExpandCancelled = useRef(initialSidebar.autoExpansionComplete)
   const [mobileOpen, setMobileOpen] = useState(false)
   const drawerRef = useRef<HTMLDialogElement>(null)
   const mainRef = useRef<HTMLElement>(null)
@@ -25,6 +51,8 @@ export function AppLayout() {
   const cancelAutoExpansion = useCallback(() => {
     autoExpandCancelled.current = true
     window.clearTimeout(autoExpandTimer.current)
+    // Completion includes cancellation: a manual choice must survive refresh.
+    saveSidebarValue(SIDEBAR_AUTO_EXPANSION_KEY, true)
   }, [])
   const toggleSidebar = () => {
     cancelAutoExpansion()
@@ -36,12 +64,23 @@ export function AppLayout() {
   }
 
   useEffect(() => {
+    saveSidebarValue(SIDEBAR_STATE_KEY, collapsed)
+    if (autoExpandCancelled.current) saveSidebarValue(SIDEBAR_AUTO_EXPANSION_KEY, true)
+  }, [collapsed])
+
+  useEffect(() => {
     if (!splashComplete || autoExpandCancelled.current) return
     const desktop = window.matchMedia('(min-width: 768px)')
-    if (!desktop.matches) return
+    if (!desktop.matches) {
+      cancelAutoExpansion()
+      return
+    }
 
     autoExpandTimer.current = window.setTimeout(() => {
-      if (desktop.matches && !autoExpandCancelled.current) setCollapsed(false)
+      if (desktop.matches && !autoExpandCancelled.current) {
+        cancelAutoExpansion()
+        setCollapsed(false)
+      }
     }, 2000)
     const cancelOnMobile = () => {
       if (!desktop.matches) cancelAutoExpansion()
