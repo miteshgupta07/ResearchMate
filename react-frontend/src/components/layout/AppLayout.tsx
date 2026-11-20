@@ -81,7 +81,7 @@ export function AppLayout() {
         cancelAutoExpansion()
         setCollapsed(false)
       }
-    }, 2000)
+    }, 1000)
     const cancelOnMobile = () => {
       if (!desktop.matches) cancelAutoExpansion()
     }
