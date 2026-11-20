@@ -1,0 +1,96 @@
+.opening-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--color-canvas);
+  pointer-events: none;
+  animation: splash-reveal 3000ms ease-in-out both;
+}
+
+.opening-splash__brand {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+}
+
+.opening-splash__mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+}
+
+.opening-splash__logo {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  animation: splash-logo-in 450ms ease-out both;
+}
+
+.opening-splash__glow,
+.opening-splash__ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.opening-splash__glow {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  filter: blur(22px);
+  animation: splash-breathe 1400ms ease-in-out both;
+}
+
+.opening-splash__ripple {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  animation: splash-ripple 1100ms cubic-bezier(0.16, 0.6, 0.3, 1) 80ms both;
+}
+
+.opening-splash__ripple--second { animation-delay: 280ms; }
+.opening-splash__ripple--third { animation-delay: 480ms; }
+
+.opening-splash__name {
+  position: relative;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: clamp(22px, 5vw, 26px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.4;
+  animation: splash-name-in 550ms cubic-bezier(0.2, 0.7, 0.3, 1) 230ms both;
+}
+
+@keyframes splash-reveal {
+  0%, 74% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+@keyframes splash-logo-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes splash-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.9); }
+  50% { opacity: 0.7; transform: scale(1.3); }
+}
+
+@keyframes splash-ripple {
+  0% { opacity: 0; transform: scale(0.75); }
+  15% { opacity: 0.5; }
+  100% { opacity: 0; transform: scale(3.15); }
+}
+
+@keyframes splash-name-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opening-splash { display: none; }
+  .opening-splash, .opening-splash * { animation: none; }
+}
