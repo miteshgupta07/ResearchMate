@@ -4,7 +4,7 @@
 import html
 import uuid
 import streamlit as st
-from frontend.css import (
+from streamlit_frontend.css import (
     load_responsive_css,
     load_chat_input_css,
     render_message,
@@ -15,7 +15,7 @@ from frontend.css import (
     render_error_banner
 )
 # Import API client for backend communication
-from frontend.api_client import (
+from streamlit_frontend.api_client import (
     send_chat_message,
     send_rag_query,
     send_agent_message,
