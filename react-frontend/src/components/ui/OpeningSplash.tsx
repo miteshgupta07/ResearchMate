@@ -14,7 +14,7 @@ function shouldShowSplash(): boolean {
   }
 }
 
-export function OpeningSplash() {
+export function OpeningSplash({ onComplete }: { onComplete: () => void }) {
   const [visible, setVisible] = useState(shouldShowSplash)
 
   useEffect(() => {
@@ -25,7 +25,10 @@ export function OpeningSplash() {
       // Storage restrictions must never prevent access to the application.
     }
 
-    if (!visible) return
+    if (!visible) {
+      onComplete()
+      return
+    }
 
     const dismiss = () => setVisible(false)
     const motionPreference = window.matchMedia(REDUCED_MOTION)
@@ -40,7 +43,7 @@ export function OpeningSplash() {
       window.clearTimeout(fallback)
       motionPreference.removeEventListener('change', onMotionChange)
     }
-  }, [visible])
+  }, [visible, onComplete])
 
   if (!visible) return null
 
