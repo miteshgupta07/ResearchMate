@@ -83,7 +83,7 @@ export function AppLayout() {
   }, [mobileOpen])
 
   return (
-    <div ref={workspaceRef} className="group/workspace fixed inset-x-0 top-[var(--workspace-top,0px)] flex h-[var(--workspace-height,100dvh)] min-h-0 overflow-hidden bg-canvas">
+    <div ref={workspaceRef} className="group/workspace fixed inset-x-0 top-(--workspace-top,0px) flex h-(--workspace-height,100dvh) min-h-0 overflow-hidden bg-canvas">
       <OpeningSplash onComplete={onSplashComplete} />
       <a href="#main-content" className="sr-only fixed top-3 left-3 z-50 rounded-lg bg-ink px-4 py-3 text-sm font-medium text-sidebar focus:not-sr-only">Skip to content</a>
       <aside aria-label="Sidebar" className={`hidden shrink-0 overflow-hidden border-r border-line/50 bg-sidebar transition-[width] duration-300 ease-in-out motion-reduce:transition-none md:block ${collapsed ? 'w-20' : 'w-64'}`}>
