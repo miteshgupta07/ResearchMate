@@ -18,7 +18,7 @@ flowchart LR
     vectors --> files["data/rag and portfolio_kb"]
 ```
 
-React produces static assets independently of Python. Its public `VITE_API_BASE_URL` selects the backend origin at build time; runtime features require a reachable API. Independent hosting requires CORS configuration and a static-host fallback to `index.html` for React Router. Streamlit remains runnable through `app.py`, with `views/` and `frontend/api_client.py` using the same backend contracts.
+React produces static assets independently of Python. Its public `VITE_API_BASE_URL` selects the backend origin at build time; runtime features require a reachable API. Independent hosting requires CORS configuration and a static-host fallback to `index.html` for React Router. Streamlit remains runnable through `app.py`, with `views/` and `streamlit_frontend/api_client.py` using the same backend contracts.
 
 ## 2. Frontend Architecture
 

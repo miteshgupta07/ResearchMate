@@ -92,7 +92,7 @@ ResearchMate/
 |   `-- init_db.py          # Legacy initializer; see setup caveat below
 |-- app.py                  # Streamlit entry point
 |-- views/                  # Streamlit pages
-|-- frontend/               # Streamlit API client and styling utilities
+|-- streamlit_frontend/     # Streamlit API client and styling utilities
 |-- portfolio_kb/           # Markdown knowledge base for the portfolio API
 |-- eval/                   # Dataset loader, metrics, evaluation runner
 |-- pdf/arxiv/              # Local benchmark data; ignored by Git
@@ -318,7 +318,7 @@ npm run build
 
 | Component | Repository evidence and status |
 | --- | --- |
-| Public frontend | [researchmate.me](https://researchmate.me/) is the existing project domain. The existing deployment is documented as Streamlit; the checked-in workflow restarts `researchmate_frontend`. |
+| Public frontend | [researchmate.me](https://researchmate.me/) is the existing project domain. The existing deployment is documented as React; the checked-in workflow restarts `react-frontend`. |
 | FastAPI | [api.researchmate.me](https://api.researchmate.me/) is the configured API domain. The workflow restarts `researchmate_backend` and checks `/health`. |
 | Host | GitHub Actions deploys through SSH to an EC2 host, updates `~/ResearchMate` to `origin/main`, and restarts systemd services. |
 | Data | The code uses PostgreSQL for chat and local disk for document storage and FAISS indexes. Database hosting, proxy/TLS configuration, and systemd unit definitions are not included. |
