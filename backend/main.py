@@ -25,6 +25,7 @@ from contextlib import asynccontextmanager
 
 from .api import chat, rag, documents, history, agent
 from .api.portfolio import router as portfolio_router
+from .api.voice import router as voice_router, voice_origin_guard
 from .core.llm import initialize_llm_registry, get_llm_registry
 from .core.rag.portfolio import build_portfolio_retriever
 
@@ -102,6 +103,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Keep the voice guard outside global CORS, including for preflight requests.
+app.middleware("http")(voice_origin_guard)
 
 # Include API routers
 app.include_router(chat.router)
@@ -110,6 +113,7 @@ app.include_router(documents.router)
 app.include_router(history.router)
 app.include_router(agent.router)
 app.include_router(portfolio_router, prefix="/portfolio", tags=["Portfolio"])
+app.include_router(voice_router)
 
 
 @app.get(
