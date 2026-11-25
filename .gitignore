@@ -12,6 +12,7 @@ data/
 AGENTS.md
 REACT_MIGRATION_PLAN.md
 VOICE_AI_BACKEND_ANALYSIS.md
+voice_poc/*
 # C extensions
 *.so
 Upgrade.md
