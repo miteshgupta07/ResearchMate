@@ -21,3 +21,11 @@ httpx==0.28.1
 # CI/CD dependencies
 ruff==0.15.18
 pytest==9.1.1
+
+# LiveKit dependencies
+livekit-agents==1.8.13
+livekit-plugins-deepgram==1.8.13
+livekit-plugins-openai==1.8.13
+livekit-plugins-cartesia==1.8.13
+livekit-plugins-silero==1.8.13
+livekit-plugins-turn-detector==1.8.13
