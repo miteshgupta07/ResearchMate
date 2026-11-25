@@ -88,9 +88,9 @@ This backend acts as a **transport layer** that:
 - Maintains session isolation for chat history
     """,
     version="2.1.1",
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None
+    # docs_url=None,
+    # redoc_url=None,
+    # openapi_url=None
 )
 
 # Configure CORS middleware
