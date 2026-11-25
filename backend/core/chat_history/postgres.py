@@ -41,7 +41,6 @@ class PostgresChatHistoryStore(ChatHistoryStore):
     
     def __init__(self):
         """Initialize the PostgreSQL store with database connection."""
-        self._current_session_id: str = ""
         self._ensure_engine()
     
     @classmethod
@@ -50,33 +49,25 @@ class PostgresChatHistoryStore(ChatHistoryStore):
         if cls._engine is None:
             cls._engine = create_engine(DatabaseConfig.get_connection_url())
     
-    def set_session(self, session_id: str) -> None:
+    def add_message(self, session_id: str, role: str, content: str) -> None:
         """
-        Set the current session context.
+        Add a new message to the specified session's chat history.
         
         Args:
-            session_id: The session identifier to use for subsequent operations
-        """
-        self._current_session_id = session_id
-    
-    def add_message(self, role: str, content: str) -> None:
-        """
-        Add a new message to the current session's chat history.
-        
-        Args:
+            session_id: The session identifier
             role: The role of the message sender (e.g., 'user', 'assistant')
             content: The text content of the message
         
         Raises:
             HTTPException: If database operation fails
         """
-        if not self._current_session_id:
-            raise ValueError("No session set. Call set_session() first.")
+        if not session_id:
+            raise ValueError("session_id must not be empty.")
         
         try:
             with self._engine.connect() as conn:
                 stmt = chat_messages.insert().values(
-                    session_id=self._current_session_id,
+                    session_id=session_id,
                     role=role,
                     content=content
                 )
@@ -88,26 +79,26 @@ class PostgresChatHistoryStore(ChatHistoryStore):
                 detail=f"Failed to add message to database: {str(e)}"
             )
     
-    def get_messages(self) -> List[dict]:
+    def get_messages(self, session_id: str) -> List[dict]:
         """
-        Get all messages for the current session in dictionary format.
+        Get all messages for the specified session in dictionary format.
         
         Returns:
             List of message dictionaries with 'role' and 'content' keys,
             ordered by created_at ASC
         """
-        if not self._current_session_id:
+        if not session_id:
             return []
-        return self.get_session_messages(self._current_session_id)
+        return self.get_session_messages(session_id)
     
-    def get_langchain_messages(self) -> List[Tuple[str, str]]:
+    def get_langchain_messages(self, session_id: str) -> List[Tuple[str, str]]:
         """
-        Convert current session messages to LangChain format for prompt templates.
+        Convert the specified session's messages to LangChain format for prompt templates.
         
         Returns:
             List of (role, content) tuples in LangChain format
         """
-        messages = self.get_messages()
+        messages = self.get_messages(session_id)
         result = []
         for msg in messages:
             role = msg["role"]
@@ -120,15 +111,15 @@ class PostgresChatHistoryStore(ChatHistoryStore):
                 result.append((role, content))
         return result
     
-    def clear(self) -> None:
+    def clear(self, session_id: str) -> None:
         """
-        Clear all messages from the current session's history.
+        Clear all messages from the specified session's history.
         
         Raises:
             HTTPException: If database operation fails
         """
-        if self._current_session_id:
-            self.clear_session(self._current_session_id)
+        if session_id:
+            self.clear_session(session_id)
     
     def get_session_messages(self, session_id: str) -> List[dict]:
         """
