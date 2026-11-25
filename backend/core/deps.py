@@ -11,7 +11,7 @@ from .chat_history import PostgresChatHistoryStore
 
 
 # Global singleton instance of the chat history store
-# This maintains state across requests within the same server process
+# Session IDs are passed per operation; only the database engine/pool is shared.
 _chat_history_store: PostgresChatHistoryStore = None
 
 
