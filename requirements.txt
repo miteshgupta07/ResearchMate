@@ -29,3 +29,4 @@ livekit-plugins-openai==1.8.13
 livekit-plugins-cartesia==1.8.13
 livekit-plugins-silero==1.8.13
 livekit-plugins-turn-detector==1.8.13
+livekit-api==1.2.3
