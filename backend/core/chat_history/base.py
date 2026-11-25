@@ -18,20 +18,21 @@ class ChatHistoryStore(ABC):
     """
     
     @abstractmethod
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, session_id: str, role: str, content: str) -> None:
         """
         Add a new message to the chat history.
         
         Args:
+            session_id: The session identifier
             role: The role of the message sender (e.g., 'user', 'assistant')
             content: The text content of the message
         """
         pass
     
     @abstractmethod
-    def get_messages(self) -> List[dict]:
+    def get_messages(self, session_id: str) -> List[dict]:
         """
-        Get all messages in dictionary format.
+        Get all messages for the specified session in dictionary format.
         
         Returns:
             List of message dictionaries with 'role' and 'content' keys
@@ -39,8 +40,8 @@ class ChatHistoryStore(ABC):
         pass
     
     @abstractmethod
-    def clear(self) -> None:
+    def clear(self, session_id: str) -> None:
         """
-        Clear all messages from history.
+        Clear all messages from the specified session's history.
         """
         pass
