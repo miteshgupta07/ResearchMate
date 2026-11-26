@@ -9,8 +9,8 @@ type Props = {
   room: Room | null
   syncing: boolean
   error?: string | null
-  onEnd: (error?: string | null) => void
-  onMicrophoneError: () => void
+  onEnd: (error?: string | null, source?: Room) => void
+  onMicrophoneError: (source: Room) => void
 }
 
 const button = 'min-h-11 rounded-full border border-line px-5 text-sm font-medium transition-colors hover:bg-canvas focus-visible:bg-accent/20 disabled:opacity-40'
@@ -57,11 +57,21 @@ function VoiceOrb({ state, audioTrack, error }: { state: OrbState; audioTrack?: 
   )
 }
 
-function VoiceActivity({ error }: Pick<Props, 'error'>) {
+function VoiceActivity({ error, onEnd }: Pick<Props, 'error' | 'onEnd'>) {
+  const room = useRoomContext()
   const connection = useConnectionState()
   const { localParticipant, isMicrophoneEnabled, microphoneTrack } = useLocalParticipant()
   const assistant = useVoiceAssistant()
   const userSpeaking = useIsSpeaking(localParticipant)
+  const agentReady = ['listening', 'thinking', 'speaking'].includes(assistant.state)
+
+  useEffect(() => {
+    if (connection !== ConnectionState.Connected || agentReady) return
+    // Legacy useVoiceAssistant has no worker-availability timeout. Reconnection
+    // remains owned by the SDK; this only bounds waiting for an unready worker.
+    const timeout = window.setTimeout(() => onEnd('The voice assistant is unavailable. Please try again later.', room), 30_000)
+    return () => window.clearTimeout(timeout)
+  }, [connection, agentReady, onEnd, room])
 
   let state: OrbState = 'connecting'
   if (error) state = 'error'
@@ -91,18 +101,18 @@ function VoiceControls({ onEnd, onMicrophoneError, error }: Pick<Props, 'onEnd' 
     changingRef.current = true
     setChanging(true)
     try { await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled) }
-    catch { onMicrophoneError() }
+    catch { onMicrophoneError(room) }
     finally { changingRef.current = false; setChanging(false) }
   }
 
   return (
     <>
-      <VoiceActivity error={error} />
+      <VoiceActivity error={error} onEnd={onEnd} />
       <div className="voice-controls mt-8 flex flex-wrap justify-center gap-3">
         <button type="button" className={button} disabled={!connected || changing} onClick={() => { void toggleMicrophone() }} aria-label={isMicrophoneEnabled ? 'Mute microphone' : 'Unmute microphone'} aria-pressed={!isMicrophoneEnabled}>
           {isMicrophoneEnabled ? 'Mute' : 'Unmute'}<span className="hidden sm:inline"> microphone</span>
         </button>
-        <button type="button" className={`${button} border-accent/30 text-accent`} onClick={() => { void room.disconnect().then(() => onEnd()).catch(() => onEnd()) }}>End conversation</button>
+        <button type="button" className={`${button} border-accent/30 text-accent`} onClick={() => onEnd(null, room)}>End conversation</button>
       </div>
       <StartAudio label="Enable speaker audio" className={`${button} mt-4`} />
       <RoomAudioRenderer />
