@@ -1,19 +1,84 @@
-import { useRef, useState } from 'react'
-import { RoomContext, RoomAudioRenderer, StartAudio, useConnectionState, useLocalParticipant, useRoomContext } from '@livekit/components-react'
+import { useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
+import { RoomContext, RoomAudioRenderer, StartAudio, useConnectionState, useIsSpeaking, useLocalParticipant, useRoomContext, useTrackVolume, useVoiceAssistant } from '@livekit/components-react'
 import { ConnectionState } from 'livekit-client'
-import type { Room } from 'livekit-client'
-import { Icon } from '../../components/ui/Icon'
+import type { LocalAudioTrack, Room } from 'livekit-client'
+import './voiceOrb.css'
 
 type Props = {
   room: Room | null
   syncing: boolean
+  error?: string | null
   onEnd: (error?: string | null) => void
   onMicrophoneError: () => void
 }
 
 const button = 'min-h-11 rounded-full border border-line px-5 text-sm font-medium transition-colors hover:bg-canvas focus-visible:bg-accent/20 disabled:opacity-40'
 
-function VoiceControls({ onEnd, onMicrophoneError }: Pick<Props, 'onEnd' | 'onMicrophoneError'>) {
+type OrbState = 'connecting' | 'reconnecting' | 'listening' | 'user-speaking' | 'thinking' | 'assistant-speaking' | 'muted' | 'syncing' | 'error'
+const labels: Partial<Record<OrbState, string>> = {
+  connecting: 'Connecting…',
+  reconnecting: 'Reconnecting…',
+  syncing: 'Syncing conversation history…',
+  error: 'Voice connection interrupted',
+}
+const volumeOptions = { fftSize: 64, smoothingTimeConstant: 0.65 }
+
+type AudioTrack = Parameters<typeof useTrackVolume>[0]
+
+// Keep SDK volume updates in this small component instead of rerendering the UI.
+function OrbAudioLevel({ track, orbRef }: { track: AudioTrack; orbRef: RefObject<HTMLDivElement | null> }) {
+  const level = useTrackVolume(track, volumeOptions)
+  const amplitude = Number.isFinite(level) ? Math.max(0, Math.min(1, level * 3)) : 0
+  useEffect(() => {
+    orbRef.current?.style.setProperty('--voice-level', String(track ? amplitude : 0))
+  }, [amplitude, orbRef, track])
+  return null
+}
+
+function VoiceOrb({ state, audioTrack, error }: { state: OrbState; audioTrack?: AudioTrack; error?: string | null }) {
+  const orbRef = useRef<HTMLDivElement>(null)
+  const message = error || labels[state]
+  return (
+    <>
+      <div className="voice-orb-stage" aria-hidden="true">
+        <div ref={orbRef} className="voice-orb" data-state={state}>
+          <OrbAudioLevel track={audioTrack} orbRef={orbRef} />
+          <div className="voice-orb__halo" />
+          <div className="voice-orb__ripple" />
+          <div className="voice-orb__ripple voice-orb__ripple--second" />
+          <div className="voice-orb__ripple voice-orb__ripple--third" />
+          <div className="voice-orb__surface"><div className="voice-orb__flow" /></div>
+        </div>
+      </div>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Voice Mode</h1>
+      {message && <p role={error ? 'alert' : 'status'} aria-atomic="true" className={`mt-3 max-w-sm text-sm leading-6 ${error ? 'text-accent' : 'text-muted'}`}>{message}</p>}
+    </>
+  )
+}
+
+function VoiceActivity({ error }: Pick<Props, 'error'>) {
+  const connection = useConnectionState()
+  const { localParticipant, isMicrophoneEnabled, microphoneTrack } = useLocalParticipant()
+  const assistant = useVoiceAssistant()
+  const userSpeaking = useIsSpeaking(localParticipant)
+
+  let state: OrbState = 'connecting'
+  if (error) state = 'error'
+  else if (connection === ConnectionState.Reconnecting || connection === ConnectionState.SignalReconnecting) state = 'reconnecting'
+  else if (connection === ConnectionState.Connected) {
+    if (!isMicrophoneEnabled) state = 'muted'
+    // Let the agent state reflect interruptions; microphone noise must not override it.
+    else if (assistant.state === 'thinking') state = 'thinking'
+    else if (assistant.state === 'speaking') state = 'assistant-speaking'
+    else if (userSpeaking) state = 'user-speaking'
+    else if (assistant.state === 'listening' || assistant.state === 'idle') state = 'listening'
+  }
+  const audioTrack = state === 'user-speaking' ? microphoneTrack?.track as LocalAudioTrack | undefined : state === 'assistant-speaking' ? assistant.audioTrack : undefined
+  return <VoiceOrb state={state} audioTrack={audioTrack} error={error} />
+}
+
+function VoiceControls({ onEnd, onMicrophoneError, error }: Pick<Props, 'onEnd' | 'onMicrophoneError' | 'error'>) {
   const room = useRoomContext()
   const state = useConnectionState()
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant()
@@ -32,10 +97,10 @@ function VoiceControls({ onEnd, onMicrophoneError }: Pick<Props, 'onEnd' | 'onMi
 
   return (
     <>
-      <p role="status" className="mt-3 text-sm text-muted">{connected ? isMicrophoneEnabled ? 'Connected · Microphone on' : 'Connected · Microphone muted' : state === ConnectionState.Reconnecting ? 'Reconnecting…' : 'Connecting…'}</p>
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
+      <VoiceActivity error={error} />
+      <div className="voice-controls mt-8 flex flex-wrap justify-center gap-3">
         <button type="button" className={button} disabled={!connected || changing} onClick={() => { void toggleMicrophone() }} aria-label={isMicrophoneEnabled ? 'Mute microphone' : 'Unmute microphone'} aria-pressed={!isMicrophoneEnabled}>
-          {isMicrophoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
+          {isMicrophoneEnabled ? 'Mute' : 'Unmute'}<span className="hidden sm:inline"> microphone</span>
         </button>
         <button type="button" className={`${button} border-accent/30 text-accent`} onClick={() => { void room.disconnect().then(() => onEnd()).catch(() => onEnd()) }}>End conversation</button>
       </div>
@@ -45,18 +110,16 @@ function VoiceControls({ onEnd, onMicrophoneError }: Pick<Props, 'onEnd' | 'onMi
   )
 }
 
-export function VoiceMode({ room, syncing, onEnd, onMicrophoneError }: Props) {
+export function VoiceMode({ room, syncing, error, onEnd, onMicrophoneError }: Props) {
   const contents = (
     <>
-      <span className="mx-auto flex size-20 items-center justify-center rounded-full border border-accent/20 bg-accent/10 text-accent"><Icon name="waveform" className="size-9" /></span>
-      <h1 className="mt-6 text-2xl font-semibold tracking-tight">Voice Mode</h1>
-      {room ? <VoiceControls onEnd={onEnd} onMicrophoneError={onMicrophoneError} /> : <>
-        <p role="status" className="mt-3 text-sm text-muted">{syncing ? 'Syncing conversation history…' : 'Connecting…'}</p>
+      {room ? <VoiceControls onEnd={onEnd} onMicrophoneError={onMicrophoneError} error={error} /> : <>
+        <VoiceOrb state={error ? 'error' : syncing ? 'syncing' : 'connecting'} error={error} />
         {!syncing && <button type="button" className={`${button} mt-8`} onClick={() => onEnd()}>End conversation</button>}
       </>}
     </>
   )
-  const className = 'mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-6 py-10 text-center'
+  const className = 'voice-mode-panel mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-6 py-6 text-center sm:py-8'
   if (!room) return <section aria-label="Voice Mode" className={className}>{contents}</section>
   return (
     <RoomContext.Provider value={room}>
