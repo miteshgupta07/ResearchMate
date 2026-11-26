@@ -53,6 +53,16 @@ export interface HistoryClearResponse {
   status: string
 }
 
+export interface VoiceSessionRequest {
+  session_id: string
+}
+
+export interface VoiceSessionResponse {
+  url: string
+  room_name: string
+  token: string
+}
+
 export interface HealthResponse {
   status: string
 }

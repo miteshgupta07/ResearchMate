@@ -11,7 +11,7 @@ data/
 # Documentation files
 AGENTS.md
 REACT_MIGRATION_PLAN.md
-
+VOICE_AI_BACKEND_ANALYSIS.md
 # C extensions
 *.so
 Upgrade.md
@@ -147,6 +147,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/

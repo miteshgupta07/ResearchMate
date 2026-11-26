@@ -15,7 +15,7 @@ export interface HistoryState {
   error: string | null
 }
 
-type HistoryLoader = (sessionId: string, options: RequestOptions) => Promise<HistoryResponse>
+type HistoryLoader = (sessionId: string, options: (RequestOptions & { waitForIdle?: boolean })) => Promise<HistoryResponse>
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -62,7 +62,7 @@ export function createHistoryStore(sessionId: string, loader: HistoryLoader = ge
       return () => { listeners.delete(listener) }
     },
     cancel,
-    async load(): Promise<void> {
+    async load(options: { waitForIdle?: boolean } = {}): Promise<void> {
       cancel()
       const requestGeneration = generation
       const controller = new AbortController()
@@ -70,7 +70,7 @@ export function createHistoryStore(sessionId: string, loader: HistoryLoader = ge
       const isCurrent = () => generation === requestGeneration && !controller.signal.aborted
       publish({ status: 'loading', messages: [], error: null })
       try {
-        const result = await loader(sessionId, { signal: controller.signal })
+        const result = await loader(sessionId, { signal: controller.signal, ...options })
         if (!isCurrent()) return
         if (!isHistory(result, sessionId)) throw new Error('Invalid history response')
         publish({

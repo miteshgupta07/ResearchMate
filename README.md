@@ -1,211 +1,190 @@
-﻿# ResearchMate
+# ResearchMate
 
-**An AI research assistant for conversational chat, PDF question answering, and research paper discovery.**
+**An AI research assistant for text and voice conversations, PDF question answering, and research paper discovery.**
 
-ResearchMate combines a React workspace with a FastAPI backend for retrieval-augmented generation (RAG), Groq-hosted language models, and PostgreSQL-backed conversation history. Upload a paper, ask questions about its content, or enable Agent Mode to route requests to document analysis and arXiv discovery.
+ResearchMate combines a React workspace with FastAPI, Groq-hosted language models, retrieval-augmented generation (RAG), and PostgreSQL conversation history. Read and discuss research through text, upload a PDF for document questions, discover papers through Agent Mode, or continue a Normal Chat conversation by voice.
 
-The new **React frontend and existing Streamlit application coexist**. Both use the same FastAPI APIs, and Streamlit remains independently runnable as an alternative interface.
+React and Streamlit coexist as independently runnable interfaces. React provides Voice Mode; Streamlit uses the text APIs.
 
-[Project website](https://researchmate.me/) · [Repository](https://github.com/miteshgupta07/ResearchMate) · [Technical deep dive](PROJECT_DEEP_DIVE.md) · [MIT License](LICENSE)
+[Project website](https://researchmate.me/) · [API health](https://api.researchmate.me/health) · [Repository](https://github.com/miteshgupta07/ResearchMate) · [Technical deep dive](PROJECT_DEEP_DIVE.md) · [MIT License](LICENSE)
 
 ## Features
 
-| Capability | Current behavior |
+| Capability | Behavior |
 | --- | --- |
-| **Normal Chat** | Conversational responses with session-based message history. |
-| **Document Q&A (RAG)** | Upload a PDF, extract and chunk its text, build a persistent FAISS index, and answer questions using retrieved context. One attached document is used at a time. |
-| **Agent Mode** | Classifies a request and routes it to one capability: chat, document Q&A, document summarization, arXiv search, or topic-based paper recommendations. Uses a single-pass router. |
-| **Research paper discovery** | Search arXiv or request recommendations in Agent Mode; results include paper information, abstract excerpts, and paper/PDF links. |
-| **Document summarization** | Ask Agent Mode to summarize an uploaded document. Summaries use retrieved chunks, rather than a dedicated pass over every page. |
-| **Chat settings** | Adjust temperature from 0 to 1 and maximum tokens from 1 to 2,048. The current model option is **GPT OSS**, mapped to `openai/gpt-oss-20b` through Groq. |
-| **Multilingual responses** | Select English, Hindi, Spanish, French, or German for AI answers and welcome messages. arXiv result formatting remains English. |
-| **Conversation history** | FastAPI stores messages in PostgreSQL and exposes retrieval and clearing by session ID. React loads history for its active session. |
-| **React workspace** | Responsive layout, Markdown/GFM answer rendering, PDF attachment controls, loading/error states, and About Chatbot / About Developer pages. |
-| **Response continuation** | The backend LLM wrapper can request bounded continuations when generation is detected as truncated. |
-| **Portfolio API** | A separate backend route answers developer questions using the Markdown knowledge base in `portfolio_kb/`. |
+| **Normal Chat** | Conversational responses with session-based PostgreSQL history. |
+| **Document Q&A (RAG)** | Upload a PDF, extract and chunk its text, build a persistent FAISS index, and answer questions using retrieved context. One document is attached at a time. |
+| **Agent Mode** | A single-pass router selects chat, document Q&A, document summarization, arXiv search, or topic-based paper recommendations. |
+| **Research paper discovery** | arXiv results include paper information, abstract excerpts, and paper/PDF links. |
+| **Document summarization** | Agent Mode summarizes retrieved document chunks; it does not perform a dedicated pass over every page. |
+| **Voice AI** | Real-time multilingual conversations over WebRTC, with speech activity detection, multilingual turn detection, natural interruptions, and spoken responses. |
+| **Shared text/voice context** | Normal Chat and Voice Mode use the same conversation UUID and stored history, so either can continue the other's committed turns. |
+| **Voice interface** | A warm animated gradient orb responds to audio and agent state. Microphone mute/unmute, connection messages, and an end-conversation control support the session lifecycle. Animations respect reduced-motion preferences. |
+| **Chat settings** | Temperature from 0 to 1 and maximum tokens from 1 to 2,048. The text model option **GPT OSS** maps to Groq's `openai/gpt-oss-20b`. |
+| **Language settings** | English, Hindi, Spanish, French, and German welcome text and a language setting for text requests. Voice uses multilingual transcription and speech-friendly instructions that follow the speaker's language. |
+| **React workspace** | Responsive layout, Markdown/GFM answers, PDF controls, loading/error states, and About Chatbot / About Developer pages. |
+| **Response continuation** | The text LLM wrapper can request bounded continuations when generation is detected as truncated. |
+| **Portfolio Chatbot** | A separate API answers developer-profile questions using the Markdown knowledge base in `portfolio_kb/`. |
 
-React retains chat settings in browser session storage, but conversation IDs, messages, and attachments stay in memory. **Refreshing the page starts a new conversation**; previous messages remain in the database under their original session ID. The UI does not provide an archive of previous sessions.
+**Voice Mode is available only in Normal Chat**, with an empty composer, Agent Mode disabled, and no attached PDF. RAG and Agent Mode remain text-only. Text requests, uploads, history synchronization, and voice connections are coordinated to prevent concurrent interactions in the same conversation.
 
-Document Q&A currently returns an empty `sources` array reserved for future use; extracted source citations are not yet available. Chat responses are returned as complete HTTP responses, without a token-streaming API.
+Chat settings persist in browser session storage. Conversation IDs, messages, and attachments remain in page memory: **refreshing starts a new conversation**, while previous messages remain under their original database session ID. The UI does not provide an archive of past sessions.
 
-## Tech Stack
+## Technology Stack
 
-| Layer | Technologies used |
+| Layer | Technologies |
 | --- | --- |
 | React frontend | React, TypeScript, Vite, Tailwind CSS, React Router |
 | Answer rendering | `react-markdown`, `remark-gfm` |
-| Alternative frontend | Streamlit, Python HTTP client |
-| HTTP backend | FastAPI, Uvicorn, Pydantic |
-| LLM inference | Groq via `langchain-groq`; GPT OSS (`openai/gpt-oss-20b`) |
-| RAG orchestration | LangChain Classic / Community, recursive character splitting |
-| Application embeddings | Hugging Face Sentence Transformers: `all-MiniLM-L6-v2` |
-| Vector search | FAISS CPU with indexes persisted on disk |
-| PDF extraction | PyMuPDF through LangChain's PDF loader |
+| Alternative frontend | Streamlit and its Python HTTP client |
+| Backend | FastAPI, Uvicorn, Pydantic |
+| Text inference | Groq GPT OSS 20B through `langchain-groq` |
+| Voice transport/orchestration | LiveKit Agents, LiveKit Cloud, WebRTC, LiveKit React/client SDKs |
+| Voice pipeline | Silero VAD → Deepgram Nova-3 Multilingual → LiveKit Multilingual Turn Detector → Groq GPT OSS 20B → Cartesia Sonic 3, using the Jacqueline voice |
+| RAG | LangChain Classic / Community, recursive character splitting, PyMuPDF |
+| Embeddings and vector search | Hugging Face Sentence Transformers `all-MiniLM-L6-v2`, FAISS CPU |
 | Persistence | PostgreSQL, SQLAlchemy Core, psycopg2 |
 | Paper discovery | arXiv Python client |
-| Development and CI | ESLint, TypeScript, Ruff, pytest, GitHub Actions, Gitleaks |
+| Testing and CI | pytest, Ruff, TypeScript, ESLint, Playwright, GitHub Actions, Gitleaks |
 
-Hugging Face supplies embedding models; the current LLM implementation uses Groq. Dependencies are declared in [requirements.txt](requirements.txt), [requirements-test.txt](requirements-test.txt), and [react-frontend/package.json](react-frontend/package.json).
+Python dependencies are pinned in [requirements.txt](requirements.txt). Frontend dependencies and their lockfile live in `react-frontend/`; Playwright is development-only.
 
 ## System Architecture
 
-React communicates with FastAPI **exclusively through HTTP APIs**. API services and TypeScript request/response types live inside `react-frontend/`; the browser does not import Python modules or directly access PostgreSQL, FAISS, backend files, or provider credentials.
-
 ```mermaid
 flowchart LR
-    reactUi["React frontend"] -->|"HTTP: JSON and multipart PDF uploads"| api["FastAPI API routers"]
-    streamlitUi["Streamlit alternative frontend"] -->|"HTTP APIs"| api
-    api --> services["Chat, RAG, agent routing, portfolio"]
-    services --> groq["Groq LLM API"]
-    services --> arxivApi["arXiv API"]
-    services --> postgres["PostgreSQL chat history"]
-    services --> rag["PDF extraction, embeddings, FAISS retrieval"]
-    rag --> storage["Local PDFs, indexes, metadata: data/rag"]
-    rag --> portfolioKb["Portfolio Markdown: portfolio_kb"]
+    react["React workspace"] -->|"HTTP: text, PDFs, history, voice token"| api["FastAPI"]
+    streamlit["Streamlit text interface"] -->|HTTP| api
+    api --> services["Chat / RAG / Agent / Portfolio"]
+    services --> groq["Groq"]
+    services --> arxiv["arXiv"]
+    services --> rag["PDFs / embeddings / FAISS"]
+    services --> db[(PostgreSQL)]
+    api -->|"Room-scoped token and agent dispatch configuration"| react
+    react <-->|"WebRTC audio"| livekit["LiveKit Cloud"]
+    livekit <-->|"Room audio"| worker["ResearchMate voice worker"]
+    worker --> providers["Silero / Deepgram / turn detector / Groq / Cartesia"]
+    worker -->|"Shared history and session locks"| db
 ```
 
-FastAPI validates requests, delegates to core services, and persists conversation messages. PDF ingestion uses 500-character chunks with 50-character overlap. Uploaded PDFs, document indexes, and metadata live under `data/rag/`; the portfolio retriever is built at API startup from `portfolio_kb/`.
+FastAPI and the voice worker run as separate Python processes. PostgreSQL advisory locks serialize same-session interactions across them. The worker loads history before speaking and drains committed history writes during graceful shutdown. React then requests one history snapshot that waits for the session lock to become available.
 
-React builds independently into static assets. `VITE_API_BASE_URL` selects the backend origin, allowing the frontend and API to run or deploy separately. See [PROJECT_DEEP_DIVE.md](PROJECT_DEEP_DIVE.md) for longer technical background; some older model, setup, and evaluation descriptions there predate this README.
+React accesses application services over HTTP and voice media through LiveKit. It does not import Python code, access PostgreSQL or FAISS directly, or hold provider API secrets. See [PROJECT_DEEP_DIVE.md](PROJECT_DEEP_DIVE.md) for lifecycle, persistence, API, and security details.
 
 ## Project Structure
 
 ```text
 ResearchMate/
-|-- react-frontend/          # Independently runnable React application
-|   |-- src/
-|   |   |-- app/            # Navigation and browser session context
-|   |   |-- components/     # Shared layout, UI, and About components
-|   |   |-- features/       # Chat, PDF documents, and settings
-|   |   |-- pages/          # Chat, About Chatbot, About Developer
-|   |   |-- services/api/   # HTTP client and endpoint helpers
-|   |   `-- types/          # TypeScript API contracts
-|   |-- public/             # Static assets
-|   |-- package.json
-|   `-- vite.config.ts
+|-- react-frontend/
+|   |-- src/app/             # Routing and browser session context
+|   |-- src/components/      # Layout, shared UI, About components
+|   |-- src/features/        # Chat, documents, settings, Voice Mode
+|   |-- src/services/api/    # HTTP client and endpoint helpers
+|   |-- src/types/           # TypeScript API contracts
+|   |-- tests/               # Playwright voice and chat regressions
+|   `-- package.json
 |-- backend/
-|   |-- main.py             # FastAPI entry point and router registration
-|   |-- api/                # Chat, RAG, documents, agent, history, portfolio
-|   |-- schemas/            # Pydantic request/response models
-|   |-- core/               # LLM services, RAG, database config, chat history
-|   |-- schema.sql          # chat_messages table definition
-|   `-- init_db.py          # Legacy initializer; see setup caveat below
-|-- app.py                  # Streamlit entry point
-|-- views/                  # Streamlit pages
-|-- streamlit_frontend/     # Streamlit API client and styling utilities
-|-- portfolio_kb/           # Markdown knowledge base for the portfolio API
-|-- eval/                   # Dataset loader, metrics, evaluation runner
-|-- pdf/arxiv/              # Local benchmark data; ignored by Git
-|-- data/rag/               # Runtime PDFs, indexes, metadata; ignored by Git
-|-- .github/workflows/      # Python checks, EC2 deployment, secret scanning
+|   |-- main.py              # FastAPI entry point
+|   |-- api/                 # Chat, RAG, Agent, Portfolio, history, voice tokens
+|   |-- schemas/             # Pydantic API contracts
+|   |-- core/                # LLM services, RAG, PostgreSQL history and locks
+|   |-- voice/agent.py       # Independent LiveKit voice worker
+|   `-- schema.sql          # Conversation table definition
+|-- app.py                   # Streamlit entry point
+|-- views/                   # Streamlit pages
+|-- streamlit_frontend/      # Streamlit API client and styling
+|-- portfolio_kb/            # Portfolio Markdown knowledge base
+|-- tests/                   # Backend and database regression tests
+|-- eval/                    # Dataset loader, metrics, evaluation runner
+|-- .github/workflows/       # Application checks, deployment, secret scanning
 |-- requirements.txt
-|-- requirements-test.txt
 |-- PROJECT_DEEP_DIVE.md
 `-- LICENSE
 ```
 
-`pdf/arxiv/` and `data/rag/` are local data locations, not files supplied by a fresh clone. A `tests/` directory is referenced in project guidance, but is absent from this branch's checkout.
+PDFs, indexes, metadata, benchmark datasets, model caches, virtual environments, and generated test/build output are local runtime artifacts, not application source supplied by a fresh clone.
 
 ## Installation & Local Setup
 
-### Prerequisites
+### 1. Install dependencies in separate Python environments
 
-- **Python 3.11**, matching the GitHub Actions environment, and a virtual environment.
-- **Node.js 22.13+ on the 22.x line, or Node.js 24+**, with npm, satisfying the installed Vite and ESLint engine requirements.
-- A running **PostgreSQL** server, with `createdb` and `psql` available for the setup below.
-- A **Groq API key** for LLM requests.
-- Internet access for initial embedding model downloads and external Groq/arXiv requests. Installing `psycopg2` from source may require PostgreSQL development libraries and compiler tools.
-
-### 1. Clone and install Python dependencies
-
-```bash
-git clone https://github.com/miteshgupta07/ResearchMate.git
-cd ResearchMate
-git switch feature/react-frontend
-python -m venv venv
-```
-
-Activate the virtual environment:
-
-```powershell
-# Windows PowerShell
-.\venv\Scripts\Activate.ps1
-```
-
-```bash
-# macOS / Linux
-source venv/bin/activate
-```
+Use Python 3.11, PostgreSQL, and Node.js 22.13+ on the 22.x line or Node.js 24+. Voice requires a LiveKit Cloud project and Groq, Deepgram, and Cartesia credentials. Initial setup requires internet access for dependencies and embedding/voice model assets.
 
 From the repository root:
 
 ```bash
-python -m pip install -r requirements.txt -r requirements-test.txt
+git clone https://github.com/miteshgupta07/ResearchMate.git
+cd ResearchMate
+python -m venv venv
+python -m venv .venv
 ```
 
-`requirements-test.txt` also declares SQLAlchemy, which the backend uses at runtime but does not explicitly list in `requirements.txt`.
+PowerShell installation:
 
-### 2. Configure environment variables
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
 
-Create a `.env` file in the **repository root**, using your own local values:
+On macOS/Linux, use `venv/bin/python` and `.venv/bin/python` instead. Both environments install the same shared manifest; the repository does not use a separate voice requirements file. Separate environments isolate the API and worker processes without changing the pinned dependency set. Building `psycopg2` from source can require PostgreSQL development libraries and compiler tools.
+
+### 2. Configure local environment variables
+
+Create a root `.env` using **your own values**. These placeholders describe local setup, not hosted infrastructure:
 
 ```dotenv
-GROQ_API_KEY=replace_with_your_groq_key
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=researchmate_db
-DB_USER=postgres
-DB_PASSWORD=replace_with_your_local_database_password
+GROQ_API_KEY=replace_with_groq_key
+LIVEKIT_URL=wss://replace_with_livekit_project_host
+LIVEKIT_API_KEY=replace_with_livekit_key
+LIVEKIT_API_SECRET=replace_with_livekit_secret
+DEEPGRAM_API_KEY=replace_with_deepgram_key
+CARTESIA_API_KEY=replace_with_cartesia_key
+DB_HOST=replace_with_local_database_host
+DB_PORT=replace_with_local_database_port
+DB_NAME=replace_with_local_database_name
+DB_USER=replace_with_local_database_user
+DB_PASSWORD=replace_with_local_database_password
 BASE_URL=http://localhost:8000
+VOICE_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+VOICE_RATE_LIMIT_REQUESTS=5
+VOICE_RATE_LIMIT_WINDOW_SECONDS=60
+VOICE_RATE_LIMIT_GLOBAL_REQUESTS=60
 ```
 
-| Variable | Used by | Purpose |
-| --- | --- | --- |
-| `GROQ_API_KEY` | Backend | Groq inference credentials. |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Backend | PostgreSQL connection configuration. |
-| `BASE_URL` | Streamlit client | FastAPI origin; defaults to `http://localhost:8000`. |
-| `VITE_API_BASE_URL` | React | Required HTTP(S) backend origin, set separately below. No path, query, or embedded credentials. |
+`GROQ_API_KEY` serves both text and voice inference. The voice worker loads the root `.env`; shell values take precedence. Optional `CARTESIA_VOICE_ID` and `CARTESIA_LANGUAGE` override the default Jacqueline voice and automatic language behavior. Include the public frontend origin in `VOICE_ALLOWED_ORIGINS` when serving the application over HTTPS.
 
-Create **`react-frontend/.env`**:
+Create `react-frontend/.env` with only public configuration:
 
 ```dotenv
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
-Keep database and provider credentials on the server. Vite exposes `VITE_*` values to the browser, so only put public configuration there. Restart Vite after changing its environment file; production API configuration is included at build time.
+Never put provider/database credentials in `VITE_*` variables: Vite embeds them in browser assets. Restart Vite after changing local configuration; production API configuration is selected at build time.
 
-### 3. Create the local database and table
+Create the configured local PostgreSQL database and execute [backend/schema.sql](backend/schema.sql) once through your PostgreSQL client. It defines `chat_messages` and is not an idempotent migration.
 
-For a new local installation, run these commands from the repository root. They prompt for the PostgreSQL password; adapt the host, port, user, and database name to match `.env`.
+### 3. Start the application
 
-```bash
-createdb -h localhost -p 5432 -U postgres -W researchmate_db
-psql -h localhost -p 5432 -U postgres -W -d researchmate_db -v ON_ERROR_STOP=1 -f backend/schema.sql
+Run each command in a separate terminal from the repository root. Addresses below are local development examples.
+
+**FastAPI:**
+
+```powershell
+.\venv\Scripts\python.exe -m uvicorn backend.main:app --reload --port 8000
 ```
 
-Skip database or table creation if it already exists. The schema creates `chat_messages` and is not an idempotent migration.
+`http://localhost:8000/health` returns `{"status":"healthy"}`. Startup initializes the LLM registry and portfolio retriever. Health checks report API availability, not database or provider readiness.
 
-**Initializer caveat:** `backend/init_db.py` still references `Config.DB_NAME` and related `DB_*` attributes, whereas the current configuration class exposes `NAME`, `HOST`, and similar names. Use the SQL schema above instead of the legacy initializer.
+**Voice worker:**
 
-### 4. Start FastAPI
-
-With the Python environment activated, run from the **repository root** so relative storage and knowledge-base paths resolve correctly:
-
-```bash
-python -m uvicorn backend.main:app --reload --port 8000
+```powershell
+.\.venv\Scripts\python.exe -m backend.voice.agent download-files
+.\.venv\Scripts\python.exe -m backend.voice.agent dev
 ```
 
-The API runs at `http://localhost:8000`. Startup initializes the LLM registry and portfolio embedding index; the first embedding download may take time. Check availability with:
+The worker registers as `researchmate-voice` with the configured LiveKit project. For standalone local audio testing, use `python -m backend.voice.agent console` in the voice environment; without application dispatch metadata, it does not read or write conversation history.
 
-```bash
-curl http://localhost:8000/health
-```
-
-The expected response is `{"status":"healthy"}`. This checks API availability, not database connectivity or external provider readiness. Interactive API documentation and OpenAPI endpoints are disabled in the current app configuration.
-
-### 5. Start React
-
-In a separate terminal:
+**React:**
 
 ```bash
 cd react-frontend
@@ -213,127 +192,66 @@ npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`. Routes are `/`, `/about-chatbot`, and `/about-developer`.
+Open the URL printed by Vite, normally `http://localhost:5173`. Voice needs microphone permission and a secure browser context: HTTPS or localhost. `npm run build` produces static assets; `npm run preview` serves a local build preview. Static hosting needs an `index.html` fallback for React Router.
 
-For a production build and local preview:
+**Optional Streamlit interface:**
 
-```bash
-npm run build
-npm run preview
+```powershell
+.\venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-The build writes `react-frontend/dist/` and does not require Python or a running backend. Chat, upload, and history requests require a reachable API at runtime. A static host must serve the built assets and fall back to `index.html` for React Router routes; the API must permit the frontend origin through CORS.
-
-### 6. Optional: start Streamlit
-
-In another terminal with the Python environment activated, run from the repository root:
-
-```bash
-python -m streamlit run app.py
-```
-
-Streamlit normally opens at `http://localhost:8501` and uses `BASE_URL` to reach FastAPI. It can run alongside React or on its own with the backend.
+Streamlit uses `BASE_URL` to reach FastAPI and can run alongside React.
 
 ## API Overview
 
-Routes are registered in [backend/main.py](backend/main.py) and implemented in [backend/api/](backend/api/). Request and response models are defined in [backend/schemas/](backend/schemas/).
-
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/` | API name, version, and health status. |
-| `GET` | `/health` | Simple availability check. |
-| `POST` | `/chat` | Normal conversation with session history. |
-| `POST` | `/documents/upload` | Multipart PDF upload using the `file` field; returns `document_id`, `filename`, and processing status. |
-| `POST` | `/rag/query` | Answer a question about the supplied `document_id`. |
-| `POST` | `/agent/route` | Classify and route a message; returns content, intent, confidence, and metadata. |
-| `GET` | `/history?session_id=...` | Retrieve messages for one session. |
-| `DELETE` | `/history?session_id=...` | Clear messages for one session. |
-| `POST` | `/portfolio/chat` | Answer developer portfolio questions from the preloaded knowledge base. |
+| `GET` | `/`, `/health` | Application information and availability. |
+| `POST` | `/chat` | Normal conversation with persisted history. |
+| `POST` | `/documents/upload` | Multipart PDF `file`; returns `document_id`, `filename`, and processing status. |
+| `POST` | `/rag/query` | Document Q&A using `document_id`. |
+| `POST` | `/agent/route` | Single-pass capability routing with intent, confidence, and metadata. |
+| `POST` | `/portfolio/chat` | Portfolio questions; returns a `response` field. |
+| `POST` | `/voice/session` | Conversation UUID in; LiveKit `url`, unique `room_name`, and room-scoped `token` out. |
+| `GET` | `/history?session_id=...` | Retrieve one conversation. Add `wait_for_idle=true` to wait for committed writes. |
+| `DELETE` | `/history?session_id=...` | Clear an idle conversation; active interactions return `409`. |
 
-Chat, RAG, and agent requests accept `session_id`, `message`, and optional `language`, `model_type`, `temperature`, and `max_tokens`. RAG additionally requires `document_id`; Agent Mode accepts it optionally. Portfolio chat accepts `session_id` and `message`, and returns a `response` field.
+Chat, RAG, and Agent requests accept `session_id`, `message`, and optional language/model/generation settings. RAG requires `document_id`; Agent accepts it optionally. Text endpoints return completed HTTP responses. RAG's `sources` array is empty; extracted source citations are not part of its response contract.
 
-Example JSON body for `POST /chat`:
-
-```json
-{
-  "session_id": "local-demo-session",
-  "message": "Explain retrieval-augmented generation.",
-  "language": "English",
-  "model_type": "GPT OSS",
-  "temperature": 0.7,
-  "max_tokens": 512
-}
-```
-
-Normal chat returns `role` and `content`. RAG adds `sources` (currently empty). React's HTTP client handles API validation errors, HTTP failures, network failures, cancellation, and timeouts; generation and upload calls default to a 120-second timeout.
+Voice tokens expire after five minutes for joining a room; this is not a running-session duration limit. The endpoint requires an allowed browser origin and applies configurable, process-local rate limits. Session UUIDs group history but do not establish ownership; see the deep dive's security limitations.
 
 ## Evaluation & Testing
 
-### RAG evaluation
-
-The [evaluation code](eval/) loads an Open RAG Benchmark-style arXiv dataset from `pdf/arxiv/`, builds a FAISS index, retrieves up to ten chunks, and optionally generates answers. It expects `queries.json`, `qrels.json`, `answers.json`, and section-level JSON documents under `corpus/`. The dataset is ignored by Git and must be supplied separately; the repository does not include an automated dataset download command.
-
-| Metric | Implementation |
-| --- | --- |
-| Recall@3, Recall@5, Recall@10 | Fraction of evaluated queries with at least one relevant chunk in the top K; a hit-rate definition. |
-| Mean Reciprocal Rank (MRR) | Average reciprocal rank of the first relevant chunk. |
-| Average groundedness | Answer/context token overlap after lowercasing and stopword removal. |
-| Grounded ratio | Fraction of evaluated answers with overlap at or above the code's **0.20** threshold. |
-
-Groundedness is a lexical heuristic, not a factual correctness guarantee or an LLM-as-judge assessment. The evaluator uses **`intfloat/e5-base-v2`**, while application RAG uses **`all-MiniLM-L6-v2`**; evaluation scores therefore do not directly represent the application's current retriever. Both use 500-character chunks with 50-character overlap. No performance or quality score is asserted here.
-
-Run from the repository root with the Python environment activated:
+The [evaluation runner](eval/) uses a locally supplied arXiv benchmark, separate FAISS retrieval, Recall@K hit rates, MRR, and lexical answer/context overlap. Evaluation embeddings (`intfloat/e5-base-v2`) differ from application embeddings (`all-MiniLM-L6-v2`), so evaluator results are not direct application-quality guarantees.
 
 ```bash
 python -m eval.run_eval --help
 python -m eval.run_eval --max-queries 50 --skip-generation
-python -m eval.run_eval --max-queries 50 --include-details
+python -m ruff check backend tests
+python -m pytest -q
+python -m pip check
 ```
 
-The runner prints a report and writes `eval/results.json` by default; use `--output PATH` to select another destination. Generation needs Groq credentials; retrieval-only evaluation still needs the dataset and embedding model. Check generation errors and evaluated-query counts before interpreting groundedness scores.
+Run Python checks in the API environment and `pip check` in both environments. To include tests against your configured PostgreSQL instance, set `RUN_POSTGRES_TESTS=1`; they use disposable session IDs and remove their test messages.
 
-### Development checks
-
-Python commands used by the deployment workflow, from the repository root:
+From `react-frontend/`:
 
 ```bash
-python -m ruff check .
-python -m pytest -v
-```
-
-**Test coverage caveat:** no test files or `tests/` directory are tracked in this checkout. pytest currently collects no tests and exits with code 5, so the workflow's test gate cannot pass on this checkout without restoring or adding tests.
-
-React checks, from `react-frontend/`:
-
-```bash
+npm ci
+npx playwright install chromium
 npm run lint
+npx tsc -b
+npm test
 npm run build
 ```
 
-`build` runs `tsc -b` before Vite. There is currently no React automated test script in `package.json`.
+Playwright covers composer behavior, audio-responsive states, reduced motion, session cleanup, conflict handling, and history synchronization. Live-media testing is opt-in and requires the API and a registered worker; see [the deep dive](PROJECT_DEEP_DIVE.md#testing-strategy).
 
-## Deployment
+## Deployment & CI/CD
 
-### Existing deployment configuration
+The high-level hosting architecture uses **AWS EC2, Nginx, HTTPS, PostgreSQL, systemd, and GitHub Actions**. Public entry points are [researchmate.me](https://researchmate.me/) and [api.researchmate.me](https://api.researchmate.me/). React serves static assets, FastAPI handles application requests, and the independent voice worker connects to LiveKit Cloud for WebRTC sessions.
 
-| Component | Repository evidence and status |
-| --- | --- |
-| Public frontend | [researchmate.me](https://researchmate.me/) is the existing project domain. The existing deployment is documented as React; the checked-in workflow restarts `react-frontend`. |
-| FastAPI | [api.researchmate.me](https://api.researchmate.me/) is the configured API domain. The workflow restarts `researchmate_backend` and checks `/health`. |
-| Host | GitHub Actions deploys through SSH to an EC2 host, updates `~/ResearchMate` to `origin/main`, and restarts systemd services. |
-| Data | The code uses PostgreSQL for chat and local disk for document storage and FAISS indexes. Database hosting, proxy/TLS configuration, and systemd unit definitions are not included. |
-| React | Implemented in `react-frontend/` and independently buildable. The checked-in deployment workflow has no Node setup, React checks, build, or static hosting step; React production deployment remains separate work. |
-
-These are repository-backed deployment details, not a live infrastructure audit. The public frontend and API health URLs could not be verified as reachable during this documentation update, and the deployed frontend version could not be confirmed.
-
-### CI/CD
-
-- [deploy.yml](.github/workflows/deploy.yml) runs on pushes to `main` and manual dispatch. Ruff runs first, followed by dependency installation and `pytest -v` on Python 3.11.
-- Deployment requires both checks and either manual dispatch or a head commit message containing `Deploy it`. It uses GitHub Secrets for EC2 SSH access, resets the server checkout to `origin/main`, and restarts the backend/frontend services.
-- Post-deployment smoke checks retry the API health URL and public frontend URL. The deploy script does not install updated dependencies, apply schema changes, or build React assets.
-- [secret-scan.yml](.github/workflows/secret-scan.yml) runs Gitleaks on pushes and pull requests targeting `main`.
-
-React hosting and any production migration must be configured separately while keeping Streamlit available. Set the public API origin at React build time and provide SPA route fallback on the selected static host.
+[deploy.yml](.github/workflows/deploy.yml) runs Python lint/tests and includes a gated deployment job that builds and publishes React assets, restarts FastAPI under systemd, validates Nginx configuration, and checks the public HTTPS endpoints. [secret-scan.yml](.github/workflows/secret-scan.yml) runs Gitleaks. The workflow does not install server-side Python dependencies, migrate PostgreSQL, or manage the voice worker lifecycle; those are separate operational responsibilities. Workflow checks do not validate a complete voice conversation.
 
 ## Developer & Project Links
 
@@ -346,6 +264,4 @@ Created by **Mitesh Gupta**.
 - [Email](mailto:miteshgupta2711@gmail.com)
 - [Technical deep dive](PROJECT_DEEP_DIVE.md)
 
-Contributions are welcome. Open an issue to discuss substantial changes and follow the repository's agent/development instructions. React work belongs in `react-frontend/` on `feature/react-frontend`; preserve Streamlit and existing API contracts.
-
-ResearchMate is released under the [MIT License](LICENSE), copyright Mitesh Gupta.
+Contributions are welcome. Open an issue to discuss substantial changes and preserve both frontends and the API contracts. ResearchMate is released under the [MIT License](LICENSE), copyright Mitesh Gupta.

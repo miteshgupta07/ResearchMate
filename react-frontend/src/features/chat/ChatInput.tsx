@@ -2,9 +2,13 @@ import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { resizeChatInput, shouldSendOnEnter } from './chatLayout'
 import { PdfAttachmentButton, PdfAttachmentStatus } from '../documents/PdfUpload'
 import { AgentModeToggle } from '../settings/AgentModeToggle'
+import { useSession } from '../../app/session/SessionContext'
+import { Icon } from '../../components/ui/Icon'
 
-export function ChatInput({ disabled, controlsDisabled = false, onSend }: { disabled: boolean; controlsDisabled?: boolean; onSend: (text: string) => boolean }) {
+export function ChatInput({ disabled, controlsDisabled = false, voiceActive = false, onStartVoice, onSend }: { disabled: boolean; controlsDisabled?: boolean; voiceActive?: boolean; onStartVoice: () => void; onSend: (text: string) => boolean }) {
   const [draft, setDraft] = useState('')
+  const { settings, document_id } = useSession()
+  const showVoice = !draft.trim() && !settings.agent_enabled && !document_id
   const id = useId()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   useLayoutEffect(() => {
@@ -47,9 +51,9 @@ export function ChatInput({ disabled, controlsDisabled = false, onSend }: { disa
         <div className="flex shrink-0 items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1">
             <PdfAttachmentButton disabled={controlsDisabled} />
-            <AgentModeToggle />
+            <AgentModeToggle disabled={voiceActive} />
           </div>
-          <button type="submit" disabled={disabled || !draft.trim()} aria-label="Send message" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-sidebar transition-colors hover:bg-ink focus-visible:bg-ink disabled:cursor-not-allowed disabled:opacity-40"><span aria-hidden="true" className="text-xl">↑</span></button>
+          <button type={showVoice ? "button" : "submit"} onClick={showVoice ? onStartVoice : undefined} disabled={disabled || (!showVoice && !draft.trim())} aria-label={showVoice ? "Start Voice Mode" : "Send message"} className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-sidebar transition-colors hover:bg-ink focus-visible:bg-ink disabled:cursor-not-allowed disabled:opacity-40">{showVoice ? <Icon name="waveform" /> : <span aria-hidden="true" className="text-xl">↑</span>}</button>
         </div>
       </div>
       <p id={`${id}-help`} className="sr-only">Enter to send. Shift+Enter for a new line.</p>

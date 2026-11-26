@@ -7,11 +7,14 @@ to PostgreSQL database.
 """
 
 from typing import Optional
+from fastapi import Depends, Request
+from starlette.concurrency import run_in_threadpool
+import anyio
 from .chat_history import PostgresChatHistoryStore
 
 
 # Global singleton instance of the chat history store
-# This maintains state across requests within the same server process
+# Session IDs are passed per operation; only the database engine/pool is shared.
 _chat_history_store: PostgresChatHistoryStore = None
 
 
@@ -28,6 +31,24 @@ def get_chat_history_store() -> PostgresChatHistoryStore:
     if _chat_history_store is None:
         _chat_history_store = PostgresChatHistoryStore()
     return _chat_history_store
+
+
+async def get_exclusive_history_store(request: Request, store=Depends(get_chat_history_store)):
+    """Keep request parsing/contracts unchanged; lock before generation begins."""
+    body = await request.json()
+    session_id = body.get("session_id") if isinstance(body, dict) else None
+    if not isinstance(session_id, str) or not session_id.strip():
+        yield store  # The endpoint's existing Pydantic validation reports invalid input.
+        return
+    guard = store.session_lock(session_id)
+    # Thread-pool checkout/cleanup must finish even if the HTTP client goes away.
+    with anyio.CancelScope(shield=True):
+        locked_store = await run_in_threadpool(guard.__enter__)
+    try:
+        yield locked_store
+    finally:
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(guard.__exit__, None, None, None)
 
 
 def get_llm(

@@ -18,7 +18,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
 from ..schemas.portfolio import PortfolioChatRequest, PortfolioChatResponse
-from ..core.deps import get_chat_history_store, get_llm
+from ..core.deps import get_exclusive_history_store, get_llm
 from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(tags=["Portfolio"])
@@ -116,7 +116,7 @@ def classify_intent(message: str) -> str:
 def portfolio_chat(
     request: PortfolioChatRequest,
     req: Request,
-    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store),
+    history_store: PostgresChatHistoryStore = Depends(get_exclusive_history_store),
 ) -> PortfolioChatResponse:
     """
     Handle a portfolio chat query with persistent history and intent routing.
@@ -150,9 +150,8 @@ def portfolio_chat(
     session_id = request.session_id.strip()
 
     try:
-        # Set session context and persist user message
-        history_store.set_session(session_id)
-        history_store.add_message("user", message)
+        # Persist user message for this session
+        history_store.add_message(session_id, "user", message)
 
         # Classify intent using structured output
         intent = classify_intent(message)
@@ -162,7 +161,7 @@ def portfolio_chat(
 
         if intent == "greeting":
             # ── Greeting: no retrieval ──
-            chat_history_langchain = history_store.get_langchain_messages()
+            chat_history_langchain = history_store.get_langchain_messages(session_id)
             prompt = ChatPromptTemplate.from_messages(
                 [
                     ("system", GREETING_SYSTEM_PROMPT),
@@ -176,7 +175,7 @@ def portfolio_chat(
         elif intent == "followup":
 
             # ── Follow-up: use chat history, no retrieval ──
-            chat_history_langchain = history_store.get_langchain_messages()
+            chat_history_langchain = history_store.get_langchain_messages(session_id)
             prompt = ChatPromptTemplate.from_messages(
                 [
                     ("system", PORTFOLIO_SYSTEM_PROMPT),
@@ -190,7 +189,7 @@ def portfolio_chat(
         else:
 
             # ── Profile query: full RAG retrieval ──
-            chat_history_langchain = history_store.get_langchain_messages()
+            chat_history_langchain = history_store.get_langchain_messages(session_id)
             context_docs = retriever.invoke(message)
             context_text = "\n\n".join(doc.page_content for doc in context_docs)
 
@@ -205,7 +204,7 @@ def portfolio_chat(
             result = chain.invoke({"context": context_text, "question": message})
 
         # Persist assistant response
-        history_store.add_message("assistant", result.content)
+        history_store.add_message(session_id, "assistant", result.content)
 
         return PortfolioChatResponse(response=result.content)
 

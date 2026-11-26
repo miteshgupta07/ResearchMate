@@ -67,6 +67,32 @@ jobs:
 
             cd ~/ResearchMate
 
+            # Preserve runtime state; never enable or start an inactive voice service.
+            voice_was_active=false
+            voice_state=$(sudo systemctl show researchmate_voice.service --property=ActiveState --value)
+            case "$voice_state" in
+              active)
+                voice_was_active=true
+                if ! sudo systemctl stop researchmate_voice.service; then
+                  echo "Failed to stop the voice service. Deployment aborted."
+                  exit 1
+                fi
+                # systemd can report a completed stop after a forced timeout.
+                voice_stop_result=$(sudo systemctl show researchmate_voice.service --property=Result --value)
+                if [ "$voice_stop_result" != "success" ]; then
+                  echo "Voice service did not stop cleanly: $voice_stop_result. Deployment aborted."
+                  exit 1
+                fi
+                ;;
+              inactive)
+                echo "Voice service is inactive; leaving it inactive."
+                ;;
+              *)
+                echo "Unexpected voice service state: $voice_state. Deployment aborted."
+                exit 1
+                ;;
+            esac
+
             git fetch origin
             git reset --hard origin/main
 
@@ -91,6 +117,18 @@ jobs:
 
             # Validate Nginx
             sudo nginx -t
+
+            if [ "$voice_was_active" = "true" ]; then
+              if ! sudo systemctl restart researchmate_voice.service; then
+                echo "Failed to restart the voice service."
+                exit 1
+              fi
+              if ! sudo systemctl is-active --quiet researchmate_voice.service; then
+                echo "Voice service is not active after restart."
+                exit 1
+              fi
+              echo "Voice service restarted and is active."
+            fi
 
       - name: Smoke Test Backend
         run: |

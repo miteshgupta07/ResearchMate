@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..schemas.agent import AgentRequest, AgentResponse
 from ..core.deps import (
-    get_chat_history_store,
+    get_exclusive_history_store,
     get_llm,
     PostgresChatHistoryStore
 )
@@ -173,14 +173,11 @@ def route_to_chat(
     language: str
 ) -> Tuple[str, Dict[str, Any]]:
     """Route to chat capability."""
-    # Set session context
-    history_store.set_session(session_id)
-    
     # Add user message to history
-    history_store.add_message("user", message)
+    history_store.add_message(session_id, "user", message)
     
     # Get chat history in LangChain format
-    chat_history_langchain = history_store.get_langchain_messages()
+    chat_history_langchain = history_store.get_langchain_messages(session_id)
     
     # Generate response using core logic (no RAG)
     from backend.core.rag import answer_without_rag
@@ -191,7 +188,7 @@ def route_to_chat(
     )
     
     # Add assistant response to history
-    history_store.add_message("assistant", response_content)
+    history_store.add_message(session_id, "assistant", response_content)
     
     return (response_content, {})
 
@@ -214,14 +211,11 @@ def route_to_rag_qa(
             detail=f"Document not found: {document_id}"
         )
     
-    # Set session context
-    history_store.set_session(session_id)
-    
     # Add user message to history
-    history_store.add_message("user", message)
+    history_store.add_message(session_id, "user", message)
     
     # Get chat history in LangChain format
-    chat_history_langchain = history_store.get_langchain_messages()
+    chat_history_langchain = history_store.get_langchain_messages(session_id)
     
     # Generate response using RAG
     response_content = answer_query(
@@ -233,7 +227,7 @@ def route_to_rag_qa(
     )
     
     # Add assistant response to history
-    history_store.add_message("assistant", response_content)
+    history_store.add_message(session_id, "assistant", response_content)
     
     return (response_content, {"document_id": document_id})
 
@@ -255,17 +249,14 @@ def route_to_rag_summary(
             detail=f"Document not found: {document_id}"
         )
     
-    # Set session context
-    history_store.set_session(session_id)
-    
     # Construct summary request
     summary_prompt = "Please provide a comprehensive summary of this document, highlighting the key points, main arguments, and conclusions."
     
     # Add user message to history
-    history_store.add_message("user", summary_prompt)
+    history_store.add_message(session_id, "user", summary_prompt)
     
     # Get chat history in LangChain format
-    chat_history_langchain = history_store.get_langchain_messages()
+    chat_history_langchain = history_store.get_langchain_messages(session_id)
     
     # Generate summary using RAG
     response_content = answer_query(
@@ -277,7 +268,7 @@ def route_to_rag_summary(
     )
     
     # Add assistant response to history
-    history_store.add_message("assistant", response_content)
+    history_store.add_message(session_id, "assistant", response_content)
     
     return (response_content, {"document_id": document_id, "type": "summary"})
 
@@ -520,7 +511,7 @@ def assemble_response(
 )
 def agent_route(
     request: AgentRequest,
-    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_exclusive_history_store)
 ) -> AgentResponse:
     """
     Handle agent routing with deterministic single-pass execution.

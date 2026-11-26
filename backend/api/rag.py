@@ -8,7 +8,7 @@ This is a thin transport layer that delegates to core RAG logic.
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..schemas.rag import RAGQueryRequest, RAGQueryResponse
-from ..core.deps import get_chat_history_store, get_llm
+from ..core.deps import get_exclusive_history_store, get_llm
 from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
@@ -22,18 +22,17 @@ router = APIRouter(prefix="/rag", tags=["RAG"])
 )
 def rag_query(
     request: RAGQueryRequest,
-    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_exclusive_history_store)
 ) -> RAGQueryResponse:
     """
     Handle a RAG query and generate a response based on document context.
     
     This endpoint:
     1. Loads the retriever for the specified document
-    2. Sets the session context for chat history
-    3. Adds the user message to history
-    4. Generates a response using RAG
-    5. Adds the assistant response to history
-    6. Returns the response with sources
+    2. Adds the user message to history
+    3. Generates a response using RAG
+    4. Adds the assistant response to history
+    5. Returns the response with sources
     
     Args:
         request: RAG query request with session_id, document_id, message, and optional language/LLM config
@@ -53,14 +52,11 @@ def rag_query(
                 detail=f"Document not found: {request.document_id}"
             )
         
-        # Set session context
-        history_store.set_session(request.session_id)
-        
         # Add user message to history
-        history_store.add_message("user", request.message)
+        history_store.add_message(request.session_id, "user", request.message)
         
         # Get chat history in LangChain format
-        chat_history_langchain = history_store.get_langchain_messages()
+        chat_history_langchain = history_store.get_langchain_messages(request.session_id)
         
         # Get LLM instance with dynamic configuration
         llm = get_llm(
@@ -79,7 +75,7 @@ def rag_query(
         )
         
         # Add assistant response to history
-        history_store.add_message("assistant", response_content)
+        history_store.add_message(request.session_id, "assistant", response_content)
         
         return RAGQueryResponse(
             role="assistant",

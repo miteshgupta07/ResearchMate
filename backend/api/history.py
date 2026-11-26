@@ -26,6 +26,7 @@ router = APIRouter(prefix="/history", tags=["History"])
 )
 def get_history(
     session_id: str = Query(..., description="The session identifier", min_length=1),
+    wait_for_idle: bool = Query(False, description="Wait for the active conversation and its final writes"),
     history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
 ) -> HistoryResponse:
     """
@@ -38,7 +39,11 @@ def get_history(
     Returns:
         HistoryResponse with session_id and list of messages
     """
-    messages = history_store.get_session_messages(session_id)
+    if wait_for_idle:
+        with history_store.session_lock(session_id, wait=True) as locked_store:
+            messages = locked_store.get_session_messages(session_id)
+    else:
+        messages = history_store.get_session_messages(session_id)
     
     return HistoryResponse(
         session_id=session_id,
@@ -69,6 +74,7 @@ def clear_history(
     Returns:
         HistoryClearResponse with status
     """
-    history_store.clear_session(session_id)
+    with history_store.session_lock(session_id) as locked_store:
+        locked_store.clear_session(session_id)
     
     return HistoryClearResponse(status="cleared")

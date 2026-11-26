@@ -8,7 +8,7 @@ This is a thin transport layer that delegates to core logic.
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..schemas.chat import ChatRequest, ChatResponse
-from ..core.deps import get_chat_history_store, get_llm
+from ..core.deps import get_exclusive_history_store, get_llm
 from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(tags=["Chat"])
@@ -22,17 +22,16 @@ router = APIRouter(tags=["Chat"])
 )
 def chat(
     request: ChatRequest,
-    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_exclusive_history_store)
 ) -> ChatResponse:
     """
     Handle a chat message and generate a response.
     
     This endpoint:
-    1. Sets the session context for chat history
-    2. Adds the user message to history
-    3. Generates a response using the LLM
-    4. Adds the assistant response to history
-    5. Returns the response
+    1. Adds the user message to history
+    2. Generates a response using the LLM
+    3. Adds the assistant response to history
+    4. Returns the response
     
     Args:
         request: Chat request with session_id, message, and optional language/LLM config
@@ -43,14 +42,11 @@ def chat(
     """
 
     try:
-        # Set session context
-        history_store.set_session(request.session_id)
-        
         # Add user message to history
-        history_store.add_message("user", request.message)
+        history_store.add_message(request.session_id, "user", request.message)
         
         # Get chat history in LangChain format
-        chat_history_langchain = history_store.get_langchain_messages()
+        chat_history_langchain = history_store.get_langchain_messages(request.session_id)
 
         # Get LLM instance with dynamic configuration
         llm = get_llm(
@@ -66,7 +62,7 @@ def chat(
             language=request.language or "English"
         )
         # Add assistant response to history
-        history_store.add_message("assistant", response_content)
+        history_store.add_message(request.session_id, "assistant", response_content)
         return ChatResponse(
             role="assistant",
             content=response_content

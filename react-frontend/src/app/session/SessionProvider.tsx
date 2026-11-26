@@ -9,6 +9,8 @@ import { createDocumentStore } from '../../features/documents/documentStore.ts'
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState(() => loadSession(getSessionStorage()))
   const [documents] = useState(() => createDocumentStore())
+  // Survives chat-page navigation, without persisting tokens or voice state.
+  const [voiceHistoryPending, setVoiceHistoryPending] = useState(false)
   const documentUpload = useSyncExternalStore(documents.subscribe, documents.getSnapshot, documents.getSnapshot)
   const documentId = documentUpload.document?.document_id ?? null
 
@@ -34,7 +36,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     updateSettings,
     mode: getChatMode(session.settings.agent_enabled, documentId),
     welcomeMessage: WELCOME_MESSAGES[session.settings.language],
-  }), [session, documentId, documentUpload, documents, updateSettings])
+    voiceHistoryPending,
+    setVoiceHistoryPending,
+  }), [session, documentId, documentUpload, documents, updateSettings, voiceHistoryPending])
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
 }

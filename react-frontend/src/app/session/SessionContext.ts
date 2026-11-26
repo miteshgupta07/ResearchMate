@@ -12,6 +12,8 @@ export interface SessionContextValue extends BrowserSession {
   updateSettings: (settings: Partial<ChatSettings>) => void
   mode: ChatMode
   welcomeMessage: string
+  voiceHistoryPending: boolean
+  setVoiceHistoryPending: (pending: boolean) => void
 }
 
 export const SessionContext = createContext<SessionContextValue | null>(null)
