@@ -108,8 +108,8 @@ def check_rate_limit(request: Request) -> None:
         _rate_clients[client] = _rate_clients.get(client, 0) + 1
 
 
-@router.post("/session", response_model=VoiceSessionResponse)
-def create_voice_session(body: VoiceSessionRequest, request: Request, history_store=Depends(get_exclusive_history_store)) -> VoiceSessionResponse:
+@router.post("/session", response_model=VoiceSessionResponse, dependencies=[Depends(get_exclusive_history_store)])
+def create_voice_session(body: VoiceSessionRequest, request: Request) -> VoiceSessionResponse:
     url = os.getenv("LIVEKIT_URL", "").strip()
     key = os.getenv("LIVEKIT_API_KEY", "").strip()
     secret = os.getenv("LIVEKIT_API_SECRET", "").strip()
