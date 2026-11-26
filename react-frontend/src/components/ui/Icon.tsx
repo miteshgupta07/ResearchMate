@@ -8,6 +8,7 @@ const paths = {
   panel: 'M9 3v18M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z',
   close: 'm6 6 12 12M6 18 18 6',
   spark: 'm12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z',
+  waveform: 'M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4',
 } as const
 
 export type IconName = keyof typeof paths
