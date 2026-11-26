@@ -7,6 +7,14 @@ import type { Room } from 'livekit-client'
 type Phase = 'idle' | 'connecting' | 'connected' | 'syncing'
 type Attempt = { controller: AbortController; joined: boolean; room?: Room }
 
+function stopMedia(room?: Room) {
+  // SDK disconnect can await signaling before stopping media. Stop it immediately.
+  room?.localParticipant.trackPublications.forEach((publication) => publication.track?.stop())
+  room?.remoteParticipants.forEach((participant) => {
+    participant.audioTrackPublications.forEach((publication) => publication.track?.detach())
+  })
+}
+
 function wait(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const abort = () => { clearTimeout(timer); reject(new DOMException('Cancelled', 'AbortError')) }
@@ -42,6 +50,7 @@ export function useVoiceSession(sessionId: string, refresh: () => Promise<void>)
   const attempt = useRef<Attempt | null>(null)
   const syncing = useRef<AbortController | null>(null)
   const generation = useRef(0)
+  const closing = useRef(false)
 
   const reconcile = useCallback(async () => {
     if (syncing.current) return
@@ -67,24 +76,29 @@ export function useVoiceSession(sessionId: string, refresh: () => Promise<void>)
     }
   }, [refresh, setVoiceHistoryPending])
 
-  const finish = useCallback((message: string | null = null) => {
+  const finish = useCallback((message: string | null = null, source?: Room) => {
     const current = attempt.current
-    if (!current) return
+    if (!current || (source && current.room !== source)) return
     attempt.current = null
+    closing.current = true
     current.controller.abort()
+    stopMedia(current.room)
+    setRoom(null)
+    if (current.joined) setPhase('syncing')
     setError(message)
     const token = generation.current
     void (async () => {
       await current.room?.disconnect().catch(() => {})
       if (generation.current !== token) return
-      setRoom(null)
+      closing.current = false
       if (current.joined) void reconcile()
       else setPhase('idle')
     })()
   }, [reconcile])
 
   const start = useCallback(async () => {
-    if (attempt.current || syncing.current || voiceHistoryPending) return
+    if (attempt.current || closing.current || syncing.current || voiceHistoryPending) return
+    generation.current += 1
     const current: Attempt = { controller: new AbortController(), joined: false }
     attempt.current = current
     setError(null)
@@ -93,7 +107,9 @@ export function useVoiceSession(sessionId: string, refresh: () => Promise<void>)
       const { Room, RoomEvent, DisconnectReason } = await import('livekit-client')
       if (attempt.current !== current || current.controller.signal.aborted) return
       current.room = new Room()
-      current.room.on(RoomEvent.Disconnected, (reason) => finish(reason === DisconnectReason.CLIENT_INITIATED ? null : 'The voice connection was lost. Reconnect to continue.'))
+      current.room.on(RoomEvent.Disconnected, (reason) => {
+        if (attempt.current === current) finish(reason === DisconnectReason.CLIENT_INITIATED ? null : 'The voice connection was lost. Reconnect to continue.', current.room)
+      })
       const details = await createVoiceSession({ session_id: sessionId }, { signal: current.controller.signal })
       if (attempt.current !== current || current.controller.signal.aborted) return
       current.joined = true
@@ -112,22 +128,29 @@ export function useVoiceSession(sessionId: string, refresh: () => Promise<void>)
     }
   }, [sessionId, voiceHistoryPending, setVoiceHistoryPending, finish])
 
-  const microphoneFailed = useCallback(() => finish('Microphone access failed. Allow microphone access in your browser and try again.'), [finish])
+  const microphoneFailed = useCallback((source: Room) => finish('Microphone access failed. Allow microphone access in your browser and try again.', source), [finish])
 
   useEffect(() => {
     if (voiceHistoryPending && !attempt.current) void reconcile()
   }, [voiceHistoryPending, reconcile])
 
-  useEffect(() => () => {
-    generation.current += 1
-    const current = attempt.current
-    attempt.current = null
-    current?.controller.abort()
-    void current?.room?.disconnect().catch(() => {})
-    syncing.current?.abort()
-    syncing.current = null
-    // The SDK disconnect stops published tracks; refresh pending history on return.
-  }, [sessionId])
+  useEffect(() => {
+    const pageLeave = () => finish()
+    window.addEventListener('pagehide', pageLeave)
+    return () => {
+      window.removeEventListener('pagehide', pageLeave)
+      generation.current += 1
+      const current = attempt.current
+      attempt.current = null
+      current?.controller.abort()
+      stopMedia(current?.room)
+      void current?.room?.disconnect().catch(() => {})
+      syncing.current?.abort()
+      syncing.current = null
+      closing.current = false
+      // Refresh pending history on return; the worker drains its own writes.
+    }
+  }, [sessionId, finish])
 
   return { phase, room, error, start, finish, microphoneFailed, busy: phase !== 'idle' || voiceHistoryPending }
 }
