@@ -40,7 +40,7 @@ async function setup(page: Page, options: { historyDelay?: number; tokenDelay?: 
 }
 
 /** Keep real LiveKit React hooks/audio renderer; stub signaling and publishing only. */
-async function mockRoom(page: Page, options: { deny?: boolean; fail?: boolean; microphoneDelay?: number } = {}) {
+async function mockRoom(page: Page, options: { deny?: boolean; fail?: boolean; microphoneDelay?: number; connectDelay?: number; disconnectDelay?: number } = {}) {
   await page.evaluate(async (flags) => {
     const source = await (await fetch('/src/features/voice/useVoiceSession.ts')).text()
     const path = source.match(/import\("([^"]*livekit-client[^"]*)"\)/)?.[1]
@@ -56,7 +56,15 @@ async function mockRoom(page: Page, options: { deny?: boolean; fail?: boolean; m
       this.localParticipant.setMicrophoneEnabled = async (enabled: boolean) => {
         if (flags.microphoneDelay) await new Promise((resolve) => setTimeout(resolve, flags.microphoneDelay))
         if (flags.deny) throw new DOMException('Denied', 'NotAllowedError')
-        if (enabled && !state.stream) state.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        if (enabled && (!state.stream || state.stream.getTracks().every((track) => track.readyState === 'ended'))) {
+          state.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+          const track = new sdk.LocalAudioTrack(state.stream.getAudioTracks()[0])
+          track.mediaStream = state.stream
+          track.source = sdk.Track.Source.Microphone
+          const publication = new sdk.LocalTrackPublication(sdk.Track.Kind.Audio, { sid: 'TR_capture', source: 2, muted: false, name: 'microphone' } as never, track)
+          this.localParticipant.trackPublications.set(publication.trackSid, publication)
+          this.localParticipant.audioTrackPublications.set(publication.trackSid, publication)
+        }
         if (this.state === sdk.ConnectionState.Disconnected) {
           state.stream?.getTracks().forEach((track) => track.stop())
           throw new Error('Disconnected during device access')
@@ -65,6 +73,9 @@ async function mockRoom(page: Page, options: { deny?: boolean; fail?: boolean; m
         this.localParticipant.emit(sdk.ParticipantEvent.ParticipantPermissionsChanged)
         return undefined
       }
+      this.state = sdk.ConnectionState.Connecting
+      if (flags.connectDelay) await new Promise((resolve) => setTimeout(resolve, flags.connectDelay))
+      if (this.state === sdk.ConnectionState.Disconnected) throw new Error('Cancelled during connect')
       this.state = sdk.ConnectionState.Connected
       this.emit(sdk.RoomEvent.ConnectionStateChanged, sdk.ConnectionState.Connected)
       this.emit(sdk.RoomEvent.Connected)
@@ -72,6 +83,7 @@ async function mockRoom(page: Page, options: { deny?: boolean; fail?: boolean; m
     const disconnect = async function (this: import('livekit-client').Room) {
       if (this.state === sdk.ConnectionState.Disconnected) return
       state.disconnects += 1
+      if (flags.disconnectDelay) await new Promise((resolve) => setTimeout(resolve, flags.disconnectDelay))
       state.mic = false
       state.stream?.getTracks().forEach((track) => track.stop())
       this.state = sdk.ConnectionState.Disconnected
@@ -372,6 +384,105 @@ test('leaving during delayed microphone access releases the eventual stream', as
   await page.getByRole('link', { name: 'About Chatbot', exact: true }).click()
   await page.waitForTimeout(1000)
   expect(await page.evaluate(() => Reflect.get(window, 'voiceTest').stream.getTracks().every((track: MediaStreamTrack) => track.readyState === 'ended'))).toBe(true)
+})
+
+test('ending voice stops media before slow signaling teardown completes', async ({ page }) => {
+  const { calls } = await setup(page)
+  await mockRoom(page, { disconnectDelay: 2000 })
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await addVisualAgent(page)
+  await expect(page.locator('audio')).toHaveCount(1)
+  const before = calls.history
+  await page.getByRole('button', { name: 'End conversation', exact: true }).click()
+  await expect(page.locator('audio')).toHaveCount(0, { timeout: 500 })
+  expect(await page.evaluate(() => Reflect.get(window, 'voiceTest').stream.getTracks().every((track: MediaStreamTrack) => track.readyState === 'ended'))).toBe(true)
+  expect(calls.history).toBe(before)
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
+})
+
+test('cancellation during room connection never enables the microphone', async ({ page }) => {
+  await setup(page)
+  await mockRoom(page, { connectDelay: 1200 })
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect.poll(() => page.evaluate(() => Reflect.get(window, 'voiceTest').connections)).toBe(1)
+  await page.getByRole('button', { name: 'End conversation', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
+  expect(await page.evaluate(() => Reflect.get(window, 'voiceTest').stream)).toBeNull()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
+
+test('old disconnect events and delayed microphone failures cannot close a new session', async ({ page }) => {
+  await setup(page)
+  await mockRoom(page)
+  const start = page.getByRole('button', { name: 'Start Voice Mode' })
+  await start.click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await page.evaluate(() => {
+    const oldRoom = Reflect.get(window, 'voiceTest').room as import('livekit-client').Room
+    Reflect.set(window, 'oldVoiceRoom', oldRoom)
+    oldRoom.localParticipant.setMicrophoneEnabled = () => new Promise((_resolve, reject) => Reflect.set(window, 'rejectOldMicrophone', reject))
+  })
+  await page.getByRole('button', { name: 'Mute microphone', exact: true }).click()
+  await page.getByRole('button', { name: 'End conversation', exact: true }).click()
+  await expect(start).toBeEnabled({ timeout: 15_000 })
+  await start.click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await page.evaluate(() => {
+    Reflect.get(window, 'oldVoiceRoom').emit('disconnected', 1)
+    Reflect.get(window, 'rejectOldMicrophone')(new Error('Late device failure'))
+  })
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  expect(await page.evaluate(() => Reflect.get(window, 'voiceTest').room.state)).toBe('connected')
+})
+
+test('unavailable workers time out and restore normal chat', async ({ page }) => {
+  await page.clock.install()
+  await setup(page)
+  await mockRoom(page)
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await page.clock.fastForward(30_100)
+  await expect(page.getByRole('alert')).toContainText('voice assistant is unavailable')
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled()
+})
+
+test('pagehide releases media and terminal connection loss restores chat', async ({ page }) => {
+  await setup(page)
+  await mockRoom(page)
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')))
+  expect(await page.evaluate(() => Reflect.get(window, 'voiceTest').stream.getTracks().every((track: MediaStreamTrack) => track.readyState === 'ended'))).toBe(true)
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await page.evaluate(() => {
+    const room = Reflect.get(window, 'voiceTest').room as import('livekit-client').Room
+    room.state = 'disconnected' as import('livekit-client').ConnectionState
+    room.emit('disconnected', 2)
+  })
+  await expect(page.getByRole('alert')).toContainText('voice connection was lost')
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
+})
+
+test('refresh stops the old microphone without automatically reconnecting', async ({ page }) => {
+  await setup(page)
+  await mockRoom(page)
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await page.evaluate(() => {
+    window.addEventListener('pagehide', () => {
+      sessionStorage.setItem('voice-test-page-exit', String(Reflect.get(window, 'voiceTest').stream.getTracks().every((track: MediaStreamTrack) => track.readyState === 'ended')))
+    })
+  })
+  await page.reload()
+  expect(await page.evaluate(() => sessionStorage.getItem('voice-test-page-exit'))).toBe('true')
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled()
+  await expect(page.getByRole('region', { name: 'Voice Mode' })).toHaveCount(0)
+  await expect(page.locator('audio')).toHaveCount(0)
 })
 
 test('live media smoke: real token endpoint, WebRTC, microphone and agent audio', async ({ page }) => {
