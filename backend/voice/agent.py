@@ -8,6 +8,7 @@ Diagnostics stay on the console; session recording is explicitly disabled.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -44,7 +45,7 @@ INSTRUCTIONS = (
     "Respond in the user's language when supported. Use natural spoken language, "
     "without Markdown, code blocks, emojis, URLs, or formatting symbols. "
     "Never speak your internal reasoning. Ask a brief clarification when needed. "
-    "You cannot access uploaded documents, search tools, or stored text chats. "
+    "You cannot access uploaded documents or search tools. "
     "For document questions or Agent Mode tools, ask the user to use ResearchMate's text chat."
 )
 log = logging.getLogger("researchmate.voice")
@@ -68,7 +69,7 @@ class SafeConsoleFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         output = super().format(record)
-        for key in REQUIRED:
+        for key in (*REQUIRED, "DB_PASSWORD"):
             value = os.environ.get(key)
             if value:
                 output = output.replace(value, "[redacted]")
@@ -191,13 +192,163 @@ def prewarm(proc: JobProcess) -> None:
     proc.userdata["vad"] = silero.VAD.load()
 
 
-server = AgentServer(setup_fnc=prewarm, initialize_process_timeout=60, host="127.0.0.1")
+def application_session_id(metadata: str) -> str | None:
+    """Read dispatch metadata, never room or participant-controlled metadata."""
+    if not metadata.strip():
+        return None
+    try:
+        values = json.loads(metadata)
+        if not isinstance(values, dict):
+            raise ValueError
+        if "session_id" not in values:
+            return None
+        if not isinstance(values["session_id"], str):
+            raise ValueError
+        return str(UUID(values["session_id"]))
+    except (ValueError, TypeError):
+        raise ValueError("Invalid application voice session metadata.") from None
+
+
+async def load_voice_history(session_id: str):
+    def read():
+        # Import after root .env loading; standalone sessions need no DB setup.
+        from backend.core.deps import get_chat_history_store
+
+        store = get_chat_history_store()
+        return store, store.get_session_messages(session_id)
+
+    try:
+        store, messages = await asyncio.to_thread(read)
+    except Exception:
+        # Store exceptions may contain SQL parameters or connection credentials.
+        raise RuntimeError("Application voice history could not be loaded.") from None
+    context = llm.ChatContext()
+    for message in messages:
+        if message["role"] in {"user", "assistant"} and message["content"].strip():
+            context.add_message(role=message["role"], content=message["content"])
+    return store, context
+
+
+def persist_voice_history(session: AgentSession, ctx: JobContext, store, session_id: str, context: llm.ChatContext):
+    """Queue committed events in order; return a shutdown coroutine that drains writes."""
+    pending: asyncio.Queue[tuple[str, str] | None] = asyncio.Queue()
+    seen = {item.id for item in context.items}
+    audio_output = None
+    playback_speech_id = None
+    playbacks = []
+    closing = False
+    failed_writes = 0
+
+    def playback_started(_event):
+        nonlocal playback_speech_id
+        speech = session.current_speech
+        speech_id = speech.id if speech is not None else None
+        if speech_id != playback_speech_id:
+            playbacks.clear()
+            playback_speech_id = speech_id
+
+    def playback_finished(event):
+        playbacks.append(event)
+
+    @session.on("agent_state_changed")
+    def observe_audio(_event):
+        nonlocal audio_output
+        # RoomIO/console initialize their output during AgentSession.start().
+        output = session.output.audio
+        if output is not None and audio_output is None:
+            audio_output = output
+            output.on("playback_started", playback_started)
+            output.on("playback_finished", playback_finished)
+
+    observe_audio(None)
+
+    @session.on("conversation_item_added")
+    def committed(event):
+        nonlocal playback_speech_id
+        item = event.item
+        if closing or not isinstance(item, llm.ChatMessage) or item.id in seen:
+            return
+        seen.add(item.id)
+        if item.role not in {"user", "assistant"}:
+            return
+        text = item.text_content or ""
+        if item.role == "assistant":
+            speech = session.current_speech
+            evidence = list(playbacks) if speech is not None and speech.id == playback_speech_id else []
+            playbacks.clear()
+            playback_speech_id = None
+            # In 1.8.13, committed assistant content is truncated to the synchronized
+            # transcript. Without synchronization, the SDK may fall back to full text.
+            if item.interrupted and (
+                not evidence
+                or any(event.synchronized_transcript is None for event in evidence)
+                or not item.metrics.get("started_speaking_at")
+            ):
+                log.warning("Interrupted voice response skipped: spoken transcript unavailable")
+                return
+            if item.interrupted:
+                text = "".join(event.synchronized_transcript for event in evidence if event.playback_position > 0)
+        if item.role == "assistant":
+            # Reasoning fields in item.extra are never read. Defensively strip tags
+            # too; the selected Groq plugin already filters reasoning from content.
+            text = re.sub(r"(?is)<(think|analysis)>.*?(?:</\1>|$)", "", text)
+        if text.strip():
+            pending.put_nowait((item.role, text))
+
+    async def write_messages():
+        nonlocal failed_writes
+        while True:
+            message = await pending.get()
+            try:
+                if message is None:
+                    return
+                if failed_writes:
+                    failed_writes += 1
+                    continue
+                try:
+                    await asyncio.to_thread(store.add_message, session_id, *message)
+                except Exception:
+                    failed_writes += 1
+                    log.error("Voice history write failed; closing the application voice session")
+                    # An insert may have committed before the connection failed.
+                    # Retrying could duplicate it in the existing schema.
+                    ctx.shutdown(reason="voice history persistence failed")
+            finally:
+                pending.task_done()
+
+    writer = asyncio.create_task(write_messages(), name="voice-history-writer")
+
+    async def finish():
+        nonlocal closing
+        if not closing:
+            closing = True
+            session.off("conversation_item_added", committed)
+            session.off("agent_state_changed", observe_audio)
+            if audio_output is not None:
+                audio_output.off("playback_started", playback_started)
+                audio_output.off("playback_finished", playback_finished)
+            pending.put_nowait(None)
+        await asyncio.shield(writer)
+        if failed_writes:
+            log.error("%d voice messages were not confirmed saved; automatic retries disabled", failed_writes)
+            raise RuntimeError("Application voice history could not be saved.") from None
+
+    return finish
+
+
+server = AgentServer(setup_fnc=prewarm, initialize_process_timeout=60, shutdown_process_timeout=60, host="127.0.0.1")
 
 
 @server.rtc_session(agent_name="researchmate-voice")
 async def entrypoint(ctx: JobContext) -> None:
     setup_logging()
     configure()
+    try:
+        session_id = application_session_id(ctx.job.metadata)
+        store, chat_ctx = await load_voice_history(session_id) if session_id else (None, llm.ChatContext())
+    except (ValueError, RuntimeError):
+        ctx.shutdown(reason="voice session metadata or history unavailable")
+        raise
     transcription, model, speech = providers()
     session = AgentSession(
         stt=transcription,
@@ -214,20 +365,32 @@ async def entrypoint(ctx: JobContext) -> None:
         tts_text_transforms=["filter_markdown", "filter_emoji", remove_urls],
     )
     diagnostics(session, ctx)
+    finish_history = persist_voice_history(session, ctx, store, session_id, chat_ctx) if store is not None else None
 
     async def shutdown() -> None:
-        await session.aclose()
-        await asyncio.gather(transcription.aclose(), model.aclose(), speech.aclose())
-        log.info("Voice providers closed")
+        try:
+            # Closing commits final transcripts and truncates interrupted speech.
+            await session.aclose()
+        finally:
+            try:
+                if finish_history is not None:
+                    await finish_history()
+            finally:
+                await asyncio.gather(transcription.aclose(), model.aclose(), speech.aclose())
+                log.info("Voice providers closed")
 
     ctx.add_shutdown_callback(shutdown)
     try:
         if not ctx.is_fake_job():  # The console supplies local audio IO without WebRTC.
             await ctx.connect()
-        await session.start(room=ctx.room, agent=Agent(instructions=INSTRUCTIONS), record=False)
-        log.info("Ready. No recordings or transcript files. Latencies exclude client/network audibility.")
+        await session.start(room=ctx.room, agent=Agent(instructions=INSTRUCTIONS, chat_ctx=chat_ctx), record=False)
+        log.info("Ready. History persistence=%s; audio recording disabled", store is not None)
         # Start in English; subsequent answers follow the user's language.
-        await session.say("Hello! I am ResearchMate. What would you like to discuss?", allow_interruptions=True)
+        await session.say(
+            "Hello! I am ResearchMate. What would you like to discuss?",
+            allow_interruptions=True,
+            add_to_chat_ctx=False,
+        )
     except Exception:
         log.exception("Voice session failed; no provider or model substitution was attempted")
         ctx.shutdown(reason="voice pipeline startup failed")
