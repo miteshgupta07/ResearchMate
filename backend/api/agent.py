@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..schemas.agent import AgentRequest, AgentResponse
 from ..core.deps import (
-    get_chat_history_store,
+    get_exclusive_history_store,
     get_llm,
     PostgresChatHistoryStore
 )
@@ -511,7 +511,7 @@ def assemble_response(
 )
 def agent_route(
     request: AgentRequest,
-    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_exclusive_history_store)
 ) -> AgentResponse:
     """
     Handle agent routing with deterministic single-pass execution.
