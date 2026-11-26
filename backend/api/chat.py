@@ -8,7 +8,7 @@ This is a thin transport layer that delegates to core logic.
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..schemas.chat import ChatRequest, ChatResponse
-from ..core.deps import get_chat_history_store, get_llm
+from ..core.deps import get_exclusive_history_store, get_llm
 from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(tags=["Chat"])
@@ -22,7 +22,7 @@ router = APIRouter(tags=["Chat"])
 )
 def chat(
     request: ChatRequest,
-    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store)
+    history_store: PostgresChatHistoryStore = Depends(get_exclusive_history_store)
 ) -> ChatResponse:
     """
     Handle a chat message and generate a response.
