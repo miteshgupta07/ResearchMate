@@ -336,7 +336,7 @@ def persist_voice_history(session: AgentSession, ctx: JobContext, store, session
     return finish
 
 
-server = AgentServer(setup_fnc=prewarm, initialize_process_timeout=60, shutdown_process_timeout=60, host="127.0.0.1")
+server = AgentServer(setup_fnc=prewarm, initialize_process_timeout=60, shutdown_process_timeout=60, host="127.0.0.1", num_idle_processes=0)
 
 
 @server.rtc_session(agent_name="researchmate-voice")
