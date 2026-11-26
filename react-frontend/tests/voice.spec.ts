@@ -84,6 +84,166 @@ async function mockRoom(page: Page, options: { deny?: boolean; fail?: boolean; m
   }, options)
 }
 
+/** Real SDK participants, publications and hooks, with generated audio for the visual meter. */
+async function addVisualAgent(page: Page) {
+  await page.evaluate(async () => {
+    const source = await (await fetch('/src/features/voice/useVoiceSession.ts')).text()
+    const path = source.match(/import\("([^"]*livekit-client[^"]*)"\)/)?.[1]
+    if (!path) throw new Error('SDK module URL was not found')
+    const sdk = await import(path) as typeof import('livekit-client')
+    const room = Reflect.get(window, 'voiceTest').room as import('livekit-client').Room
+    let attributes = { 'lk.agent.state': 'listening' }
+    const agent = new sdk.RemoteParticipant({} as never, 'PA_visual', 'researchmate-voice', undefined, undefined, attributes, undefined, sdk.ParticipantKind.AGENT)
+    Object.defineProperty(agent, 'attributes', { get: () => attributes })
+    const context = new AudioContext()
+    await context.resume()
+    const tone = () => {
+      const oscillator = context.createOscillator()
+      oscillator.frequency.value = 440
+      const gain = context.createGain()
+      gain.gain.value = 0
+      const output = context.createMediaStreamDestination()
+      oscillator.connect(gain).connect(output)
+      oscillator.start()
+      return { oscillator, gain, stream: output.stream }
+    }
+    const local = tone()
+    const remote = tone()
+    const localTrack = new sdk.LocalAudioTrack(local.stream.getAudioTracks()[0])
+    localTrack.mediaStream = local.stream
+    localTrack.source = sdk.Track.Source.Microphone
+    const localPublication = new sdk.LocalTrackPublication(sdk.Track.Kind.Audio, { sid: 'TR_local', source: 2, muted: false, name: 'microphone' } as never, localTrack)
+    localPublication.source = sdk.Track.Source.Microphone
+    room.localParticipant.audioTrackPublications.set(localPublication.trackSid, localPublication)
+    room.localParticipant.trackPublications.set(localPublication.trackSid, localPublication)
+    room.localParticipant.emit(sdk.ParticipantEvent.ParticipantPermissionsChanged)
+    const remoteTrack = new sdk.RemoteAudioTrack(remote.stream.getAudioTracks()[0], 'TR_remote', undefined as never)
+    remoteTrack.mediaStream = remote.stream
+    remoteTrack.source = sdk.Track.Source.Microphone
+    const remotePublication = new sdk.RemoteTrackPublication(sdk.Track.Kind.Audio, { sid: 'TR_remote', source: 2, muted: false, name: 'agent-audio', mimeType: 'audio/opus' } as never, true)
+    remotePublication.setTrack(remoteTrack)
+    agent.audioTrackPublications.set(remotePublication.trackSid, remotePublication)
+    agent.trackPublications.set(remotePublication.trackSid, remotePublication)
+    room.remoteParticipants.set(agent.identity, agent)
+    room.emit(sdk.RoomEvent.ParticipantConnected, agent)
+    room.emit(sdk.RoomEvent.TrackSubscribed, remoteTrack, remotePublication, agent)
+    Object.assign(Reflect.get(window, 'voiceTest'), {
+      setAgentState: (state: string) => {
+        attributes = { 'lk.agent.state': state }
+        agent.emit(sdk.ParticipantEvent.AttributesChanged, attributes)
+      },
+      setUserSpeaking: (speaking: boolean) => room.localParticipant.setIsSpeaking(speaking),
+      setConnectionState: (state: import('livekit-client').ConnectionState) => {
+        room.state = state
+        room.emit(sdk.RoomEvent.ConnectionStateChanged, state)
+      },
+      setLevel: (speaker: string, value: number) => (speaker === 'local' ? local : remote).gain.gain.setValueAtTime(value, context.currentTime),
+    })
+    room.once(sdk.RoomEvent.Disconnected, () => {
+      local.oscillator.stop(); remote.oscillator.stop()
+      localTrack.stop(); remoteTrack.stop()
+      void context.close()
+    })
+  })
+}
+
+test('orb follows SDK states, audio amplitude, interruption and mute', async ({ page }) => {
+  await setup(page)
+  await mockRoom(page)
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  const orb = page.locator('.voice-orb')
+  await expect(orb).toHaveAttribute('data-state', 'connecting')
+  await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toContainText('Connecting')
+  await addVisualAgent(page)
+  await expect(orb).toHaveAttribute('data-state', 'listening')
+  await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toHaveCount(0)
+  await expect(page.locator('.voice-orb__surface')).toHaveCSS('animation-name', 'voice-orb-breathe')
+  await expect(page.locator('.voice-orb__flow')).toHaveCSS('animation-name', 'voice-orb-flow')
+  const flowTransform = await page.locator('.voice-orb__flow').evaluate((node) => getComputedStyle(node).transform)
+  await expect.poll(() => page.locator('.voice-orb__flow').evaluate((node) => getComputedStyle(node).transform)).not.toBe(flowTransform)
+  await expect(page.locator('.opening-splash')).toHaveCount(0)
+  await page.screenshot({ path: 'node_modules/.cache/voice-orb-desktop.png' })
+  await page.evaluate(() => Reflect.get(window, 'voiceTest').setAgentState('thinking'))
+  await expect(orb).toHaveAttribute('data-state', 'thinking')
+  await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toHaveCount(0)
+  await expect(page.locator('.voice-orb__surface')).toHaveCSS('animation-name', 'voice-orb-think')
+  await page.evaluate(() => {
+    Reflect.get(window, 'voiceTest').setAgentState('speaking')
+    Reflect.get(window, 'voiceTest').setLevel('remote', 0.03)
+  })
+  await expect(orb).toHaveAttribute('data-state', 'assistant-speaking')
+  await expect.poll(() => orb.evaluate((node) => Number((node as HTMLElement).style.getPropertyValue('--voice-level')))).toBeGreaterThan(0.05)
+  await expect(page.locator('.voice-orb__ripple').first()).toHaveCSS('animation-name', 'voice-orb-ripple')
+  await page.evaluate(() => {
+    Reflect.get(window, 'voiceTest').setLevel('local', 0.03)
+    Reflect.get(window, 'voiceTest').setUserSpeaking(true)
+  })
+  // Microphone noise/activity cannot replace the assistant's speaking animation.
+  await expect(orb).toHaveAttribute('data-state', 'assistant-speaking')
+  await page.evaluate(() => Reflect.get(window, 'voiceTest').setAgentState('listening'))
+  await expect(orb).toHaveAttribute('data-state', 'user-speaking')
+  await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toHaveCount(0)
+  await expect.poll(() => orb.evaluate((node) => Number((node as HTMLElement).style.getPropertyValue('--voice-level')))).toBeGreaterThan(0.05)
+  await page.evaluate(() => {
+    Reflect.get(window, 'voiceTest').setLevel('local', 0)
+    Reflect.get(window, 'voiceTest').setUserSpeaking(false)
+    Reflect.get(window, 'voiceTest').setAgentState('speaking')
+  })
+  await expect(orb).toHaveAttribute('data-state', 'assistant-speaking')
+  await page.getByRole('button', { name: 'Mute microphone', exact: true }).click()
+  await expect(orb).toHaveAttribute('data-state', 'muted')
+  await expect(page.getByRole('button', { name: 'Unmute microphone', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toHaveCount(0)
+  await expect(page.locator('.voice-orb__surface')).toHaveCSS('animation-name', 'none')
+  await page.getByRole('button', { name: 'Unmute microphone', exact: true }).click()
+  await expect(orb).toHaveAttribute('data-state', 'assistant-speaking')
+  await page.evaluate(() => Reflect.get(window, 'voiceTest').setConnectionState('reconnecting'))
+  await expect(orb).toHaveAttribute('data-state', 'reconnecting')
+  await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toContainText('Reconnecting')
+  await page.evaluate(() => Reflect.get(window, 'voiceTest').setConnectionState('connected'))
+  await expect(orb).toHaveAttribute('data-state', 'assistant-speaking')
+  await page.getByRole('button', { name: 'End conversation', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
+})
+
+test('orb honors reduced motion without hiding state updates', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await setup(page)
+  await mockRoom(page)
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  await addVisualAgent(page)
+  await expect(page.locator('.voice-orb')).toHaveAttribute('data-state', 'listening')
+  await page.evaluate(() => Reflect.get(window, 'voiceTest').setAgentState('thinking'))
+  await expect(page.locator('.voice-orb')).toHaveAttribute('data-state', 'thinking')
+  for (const layer of ['.voice-orb__surface', '.voice-orb__halo', '.voice-orb__flow']) {
+    await expect(page.locator(layer)).toHaveCSS('animation-name', 'none')
+    await expect(page.locator(layer)).toHaveCSS('transform', 'none')
+  }
+  await expect(page.locator('.voice-orb__ripple').first()).toHaveCSS('display', 'none')
+  await page.getByRole('button', { name: 'Mute microphone', exact: true }).click()
+  await expect(page.locator('.voice-orb')).toHaveAttribute('data-state', 'muted')
+  await expect(page.getByRole('button', { name: 'Unmute microphone', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toHaveCount(0)
+})
+
+test('orb and controls fit a compact mobile chat workspace', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await setup(page)
+  await mockRoom(page)
+  await page.getByRole('button', { name: 'Start Voice Mode' }).click()
+  await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
+  const orb = await page.locator('.voice-orb').boundingBox()
+  const workspace = await page.getByRole('region', { name: 'Chat messages' }).boundingBox()
+  expect(orb && workspace).toBeTruthy()
+  expect(Math.abs(orb!.x + orb!.width / 2 - (workspace!.x + workspace!.width / 2))).toBeLessThan(2)
+  await expect(page.getByRole('button', { name: 'End conversation', exact: true })).toBeInViewport()
+  expect(await page.getByRole('region', { name: 'Chat messages' }).evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
+  await expect(page.locator('.opening-splash')).toHaveCount(0)
+  await page.screenshot({ path: 'node_modules/.cache/voice-orb-mobile.png' })
+})
+
 test('composer switches between voice, text, Agent and PDF modes', async ({ page }) => {
   const { calls } = await setup(page)
   const voice = page.getByRole('button', { name: 'Start Voice Mode' })
@@ -208,7 +368,7 @@ test('leaving during delayed microphone access releases the eventual stream', as
   await setup(page)
   await mockRoom(page, { microphoneDelay: 700 })
   await page.getByRole('button', { name: 'Start Voice Mode' }).click()
-  await expect(page.getByText('Connected · Microphone muted', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Unmute microphone', exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'About Chatbot', exact: true }).click()
   await page.waitForTimeout(1000)
   expect(await page.evaluate(() => Reflect.get(window, 'voiceTest').stream.getTracks().every((track: MediaStreamTrack) => track.readyState === 'ended'))).toBe(true)
