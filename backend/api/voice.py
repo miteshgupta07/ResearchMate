@@ -11,9 +11,11 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from livekit import api
 from starlette.responses import JSONResponse, Response
+
+from ..core.deps import get_exclusive_history_store
 
 from ..schemas.voice import VoiceSessionRequest, VoiceSessionResponse
 
@@ -107,7 +109,7 @@ def check_rate_limit(request: Request) -> None:
 
 
 @router.post("/session", response_model=VoiceSessionResponse)
-def create_voice_session(body: VoiceSessionRequest, request: Request) -> VoiceSessionResponse:
+def create_voice_session(body: VoiceSessionRequest, request: Request, history_store=Depends(get_exclusive_history_store)) -> VoiceSessionResponse:
     url = os.getenv("LIVEKIT_URL", "").strip()
     key = os.getenv("LIVEKIT_API_KEY", "").strip()
     secret = os.getenv("LIVEKIT_API_SECRET", "").strip()
