@@ -6,6 +6,8 @@ Uses SQLAlchemy Core for database operations.
 """
 
 from typing import List, Tuple
+from contextlib import contextmanager, nullcontext
+from hashlib import blake2b
 
 from fastapi import HTTPException
 from sqlalchemy import create_engine, MetaData, Table, Column, BigInteger, String, Text, DateTime, text
@@ -39,9 +41,58 @@ class PostgresChatHistoryStore(ChatHistoryStore):
     
     _engine: Engine = None
     
-    def __init__(self):
+    def __init__(self, connection=None):
         """Initialize the PostgreSQL store with database connection."""
         self._ensure_engine()
+        self._connection = connection
+
+    def _connect(self):
+        if self._connection is not None:
+            if self._connection.invalidated or self._connection.closed:
+                raise RuntimeError("The conversation database connection was lost.")
+            return nullcontext(self._connection)
+        return self._engine.connect()
+
+    @contextmanager
+    def session_lock(self, session_id: str, *, wait: bool = False):
+        """Own one session on a checked-out connection, including all history writes.
+
+        Session locks survive commits and disappear when the owning process/DB
+        connection terminates. Always unlock before returning a connection to the pool.
+        """
+        key = int.from_bytes(blake2b(session_id.strip().encode(), digest_size=8).digest(), "big", signed=True)
+        connection = None
+        acquired = False
+        try:
+            try:
+                connection = self._engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+                if wait:
+                    connection.execute(text("SET statement_timeout = '60s'"))
+                    connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": key})
+                    acquired = True
+                else:
+                    acquired = connection.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": key}).scalar_one()
+                connection.commit()
+            except Exception:
+                if connection is not None:
+                    connection.invalidate()
+                raise HTTPException(status_code=503, detail="Conversation database is unavailable. Try again later.") from None
+            if not acquired:
+                raise HTTPException(status_code=409, detail="This conversation is busy. End Voice Mode or wait for the current response before trying again.")
+            yield PostgresChatHistoryStore(connection)
+        finally:
+            if connection is not None:
+                try:
+                    if not connection.invalidated:
+                        if acquired:
+                            connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
+                        if wait:
+                            connection.execute(text("RESET statement_timeout"))
+                        connection.commit()
+                except Exception:
+                    connection.invalidate()
+                finally:
+                    connection.close()
     
     @classmethod
     def _ensure_engine(cls) -> None:
@@ -65,7 +116,7 @@ class PostgresChatHistoryStore(ChatHistoryStore):
             raise ValueError("session_id must not be empty.")
         
         try:
-            with self._engine.connect() as conn:
+            with self._connect() as conn:
                 stmt = chat_messages.insert().values(
                     session_id=session_id,
                     role=role,
@@ -136,11 +187,11 @@ class PostgresChatHistoryStore(ChatHistoryStore):
             HTTPException: If database operation fails
         """
         try:
-            with self._engine.connect() as conn:
+            with self._connect() as conn:
                 stmt = (
                     chat_messages.select()
                     .where(chat_messages.c.session_id == session_id)
-                    .order_by(chat_messages.c.created_at.asc())
+                    .order_by(chat_messages.c.created_at.asc(), chat_messages.c.id.asc())
                 )
                 result = conn.execute(stmt)
                 return [
@@ -164,7 +215,7 @@ class PostgresChatHistoryStore(ChatHistoryStore):
             HTTPException: If database operation fails
         """
         try:
-            with self._engine.connect() as conn:
+            with self._connect() as conn:
                 stmt = chat_messages.delete().where(
                     chat_messages.c.session_id == session_id
                 )
