@@ -209,12 +209,12 @@ def application_session_id(metadata: str) -> str | None:
         raise ValueError("Invalid application voice session metadata.") from None
 
 
-async def load_voice_history(session_id: str):
+async def load_voice_history(session_id: str, history_store=None):
     def read():
         # Import after root .env loading; standalone sessions need no DB setup.
         from backend.core.deps import get_chat_history_store
 
-        store = get_chat_history_store()
+        store = history_store if history_store is not None else get_chat_history_store()
         return store, store.get_session_messages(session_id)
 
     try:
@@ -343,44 +343,76 @@ server = AgentServer(setup_fnc=prewarm, initialize_process_timeout=60, shutdown_
 async def entrypoint(ctx: JobContext) -> None:
     setup_logging()
     configure()
-    try:
-        session_id = application_session_id(ctx.job.metadata)
-        store, chat_ctx = await load_voice_history(session_id) if session_id else (None, llm.ChatContext())
-    except (ValueError, RuntimeError):
-        ctx.shutdown(reason="voice session metadata or history unavailable")
-        raise
-    transcription, model, speech = providers()
-    session = AgentSession(
-        stt=transcription,
-        llm=model,
-        tts=speech,
-        vad=ctx.proc.userdata["vad"],
-        turn_handling={
-            "turn_detection": MultilingualModel(),
-            "endpointing": {"mode": "fixed", "min_delay": 0.5, "max_delay": 3.0},
-            # Explicit VAD mode avoids adding a hosted adaptive interruption model.
-            "interruption": {"enabled": True, "mode": "vad", "resume_false_interruption": True},
-            "preemptive_generation": {"enabled": False},
-        },
-        tts_text_transforms=["filter_markdown", "filter_emoji", remove_urls],
-    )
-    diagnostics(session, ctx)
-    finish_history = persist_voice_history(session, ctx, store, session_id, chat_ctx) if store is not None else None
+    guard = None
+    acquisition = None
+    session = None
+    finish_history = None
+    components = ()
+    shutdown_task = None
 
-    async def shutdown() -> None:
+    async def close_resources() -> None:
         try:
-            # Closing commits final transcripts and truncates interrupted speech.
-            await session.aclose()
-        finally:
             try:
+                if session is not None:
+                    # Close commits final transcripts before the writer drains.
+                    await session.aclose()
+            finally:
                 if finish_history is not None:
                     await finish_history()
+        finally:
+            try:
+                await asyncio.gather(*(component.aclose() for component in components))
             finally:
-                await asyncio.gather(transcription.aclose(), model.aclose(), speech.aclose())
-                log.info("Voice providers closed")
+                if acquisition is not None:
+                    try:
+                        await acquisition
+                    except Exception:
+                        pass  # An unsuccessful acquisition has already closed its connection.
+                    else:
+                        await asyncio.to_thread(guard.__exit__, None, None, None)
+
+    async def shutdown() -> None:
+        nonlocal shutdown_task
+        if shutdown_task is None:
+            shutdown_task = asyncio.create_task(close_resources())
+        # A cancelled shutdown caller must not release the lock ahead of writes.
+        await asyncio.shield(shutdown_task)
 
     ctx.add_shutdown_callback(shutdown)
     try:
+        session_id = application_session_id(ctx.job.metadata)
+        if session_id:
+            from backend.core.deps import get_chat_history_store
+
+            try:
+                store = await asyncio.to_thread(get_chat_history_store)
+            except Exception:
+                raise RuntimeError("Application voice history could not be loaded.") from None
+            guard = store.session_lock(session_id)
+            acquisition = asyncio.create_task(asyncio.to_thread(guard.__enter__))
+            store = await asyncio.shield(acquisition)
+            store, chat_ctx = await load_voice_history(session_id, store)
+        else:
+            store, chat_ctx = None, llm.ChatContext()
+        components = providers()
+        transcription, model, speech = components
+        session = AgentSession(
+            stt=transcription,
+            llm=model,
+            tts=speech,
+            vad=ctx.proc.userdata["vad"],
+            turn_handling={
+                "turn_detection": MultilingualModel(),
+                "endpointing": {"mode": "fixed", "min_delay": 0.5, "max_delay": 3.0},
+                # Explicit VAD mode avoids adding a hosted adaptive interruption model.
+                "interruption": {"enabled": True, "mode": "vad", "resume_false_interruption": True},
+                "preemptive_generation": {"enabled": False},
+            },
+            tts_text_transforms=["filter_markdown", "filter_emoji", remove_urls],
+        )
+        diagnostics(session, ctx)
+        finish_history = persist_voice_history(session, ctx, store, session_id, chat_ctx) if store is not None else None
+
         if not ctx.is_fake_job():  # The console supplies local audio IO without WebRTC.
             await ctx.connect()
         await session.start(room=ctx.room, agent=Agent(instructions=INSTRUCTIONS, chat_ctx=chat_ctx), record=False)
@@ -394,6 +426,7 @@ async def entrypoint(ctx: JobContext) -> None:
     except Exception:
         log.exception("Voice session failed; no provider or model substitution was attempted")
         ctx.shutdown(reason="voice pipeline startup failed")
+        await shutdown()
         raise
 
 
