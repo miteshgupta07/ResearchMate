@@ -18,7 +18,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
 from ..schemas.portfolio import PortfolioChatRequest, PortfolioChatResponse
-from ..core.deps import get_chat_history_store, get_llm
+from ..core.deps import get_exclusive_history_store, get_llm
 from ..core.chat_history import PostgresChatHistoryStore
 
 router = APIRouter(tags=["Portfolio"])
@@ -116,7 +116,7 @@ def classify_intent(message: str) -> str:
 def portfolio_chat(
     request: PortfolioChatRequest,
     req: Request,
-    history_store: PostgresChatHistoryStore = Depends(get_chat_history_store),
+    history_store: PostgresChatHistoryStore = Depends(get_exclusive_history_store),
 ) -> PortfolioChatResponse:
     """
     Handle a portfolio chat query with persistent history and intent routing.
