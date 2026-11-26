@@ -3,8 +3,8 @@ import type { Page } from '@playwright/test'
 
 type Message = { role: string; content: string }
 
-async function setup(page: Page, options: { historyDelay?: number; tokenDelay?: number; tokenStatus?: number; textDelay?: number; uploadDelay?: number } = {}) {
-  const calls: { history: number; voice: string[]; chat: string[] } = { history: 0, voice: [], chat: [] }
+async function setup(page: Page, options: { historyDelay?: number; tokenDelay?: number; tokenStatus?: number; textDelay?: number; textStatus?: number; uploadDelay?: number } = {}) {
+  const calls: { history: number; historyWaits: number; voice: string[]; chat: string[] } = { history: 0, historyWaits: 0, voice: [], chat: [] }
   const messages: Message[] = []
   await page.route('http://127.0.0.1:8765/**', async (route) => {
     const request = route.request()
@@ -15,6 +15,7 @@ async function setup(page: Page, options: { historyDelay?: number; tokenDelay?: 
     let status = 200
     if (url.pathname === '/history') {
       calls.history += 1
+      if (url.searchParams.get('wait_for_idle') === 'true') calls.historyWaits += 1
       if (options.historyDelay) await new Promise((resolve) => setTimeout(resolve, options.historyDelay))
       body = { session_id: url.searchParams.get('session_id'), messages }
     } else if (url.pathname === '/voice/session') {
@@ -29,8 +30,9 @@ async function setup(page: Page, options: { historyDelay?: number; tokenDelay?: 
       if (options.textDelay) await new Promise((resolve) => setTimeout(resolve, options.textDelay))
       const data = request.postDataJSON()
       calls.chat.push(url.pathname)
-      messages.push({ role: 'user', content: data.message }, { role: 'assistant', content: 'Text answer' })
-      body = { role: 'assistant', content: 'Text answer', sources: [], intent: 'INTENT_CHAT', confidence: 1, metadata: {} }
+      status = options.textStatus ?? 200
+      if (status === 200) messages.push({ role: 'user', content: data.message }, { role: 'assistant', content: 'Text answer' })
+      body = status === 200 ? { role: 'assistant', content: 'Text answer', sources: [], intent: 'INTENT_CHAT', confidence: 1, metadata: {} } : { detail: 'Conversation is busy.' }
     }
     await route.fulfill({ status, headers, contentType: 'application/json', body: JSON.stringify(body) })
   })
@@ -299,6 +301,16 @@ test('voice is disabled during initial history and text requests', async ({ page
   await expect(voice).toBeEnabled()
 })
 
+test('text conflicts show a useful error without duplicating an unsaved message', async ({ page }) => {
+  await setup(page, { textStatus: 409 })
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled()
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Concurrent text question')
+  await page.getByRole('button', { name: 'Send message' }).click()
+  await expect(page.getByRole('alert')).toContainText('conversation is busy')
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeEnabled()
+  await expect(page.getByText('Concurrent text question', { exact: true })).toHaveCount(0)
+})
+
 test('voice is disabled during a PDF upload and stays unavailable after attachment', async ({ page }) => {
   await setup(page, { uploadDelay: 1500 })
   await page.locator('input[type=file]').setInputFiles({ name: 'paper.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nTest') })
@@ -324,8 +336,9 @@ test('connecting locks controls, cancel prevents a late connection', async ({ pa
 })
 
 test('microphone toggle, ordered history refresh and resource cleanup', async ({ page }) => {
-  const { calls, messages } = await setup(page)
+  const { calls, messages } = await setup(page, { historyDelay: 1500 })
   await mockRoom(page)
+  await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled()
   await page.getByRole('button', { name: 'Start Voice Mode' }).click()
   await expect(page.getByRole('button', { name: 'Mute microphone', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Mute microphone', exact: true }).click()
@@ -334,12 +347,13 @@ test('microphone toggle, ordered history refresh and resource cleanup', async ({
   const historyBefore = calls.history
   await page.getByRole('button', { name: 'End conversation', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeDisabled()
-  await page.waitForTimeout(1800)
+  await expect.poll(() => calls.historyWaits).toBe(1)
   messages.push({ role: 'user', content: 'Voice question' }, { role: 'assistant', content: 'Voice answer' })
   await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
   await expect(page.getByText('Voice answer', { exact: true })).toHaveCount(1)
   await expect(page.getByText('Voice question', { exact: true })).toHaveCount(1)
-  expect(calls.history - historyBefore).toBe(5)
+  expect(calls.history - historyBefore).toBe(1)
+  expect(calls.historyWaits).toBe(1)
   expect(calls.voice).toHaveLength(1)
   expect(await page.evaluate(() => Reflect.get(window, 'voiceTest').stream.getTracks().every((track: MediaStreamTrack) => track.readyState === 'ended'))).toBe(true)
   expect(await page.evaluate(() => JSON.stringify(sessionStorage))).not.toContain('test-voice-token')
@@ -366,12 +380,12 @@ test('navigation disconnects and refreshes pending history on return', async ({ 
   expect(calls.voice[1]).toBe(sessionId)
 })
 
-for (const failure of ['permission', 'connection', 'rate limit'] as const) {
+for (const failure of ['permission', 'connection', 'rate limit', 'conflict'] as const) {
   test(`handles ${failure} failure and restores text chat`, async ({ page }) => {
-    await setup(page, { tokenStatus: failure === 'rate limit' ? 429 : 200 })
+    await setup(page, { tokenStatus: failure === 'rate limit' ? 429 : failure === 'conflict' ? 409 : 200 })
     await mockRoom(page, { deny: failure === 'permission', fail: failure === 'connection' })
     await page.getByRole('button', { name: 'Start Voice Mode' }).click()
-    await expect(page.getByRole('alert')).toContainText(failure === 'permission' ? 'Microphone access failed' : failure === 'rate limit' ? 'Too many voice' : 'Could not connect')
+    await expect(page.getByRole('alert')).toContainText(failure === 'permission' ? 'Microphone access failed' : failure === 'rate limit' ? 'Too many voice' : failure === 'conflict' ? 'conversation is busy' : 'Could not connect')
     await expect(page.getByRole('button', { name: 'Start Voice Mode' })).toBeEnabled({ timeout: 15_000 })
   })
 }

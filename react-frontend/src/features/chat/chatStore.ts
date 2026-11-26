@@ -22,6 +22,7 @@ function sendErrorMessage(error: unknown, documentQuery: boolean): string {
     if (documentQuery && (error.status === 404 || error.validationErrors.some((issue) => issue.loc.includes('document_id')))) {
       return 'This document is unavailable or invalid. Remove it or upload the PDF again before asking another document question.'
     }
+    if (error.status === 409) return 'This conversation is busy. End Voice Mode or wait for the current response, then try again.'
     if (error.kind === 'timeout') return 'The response timed out. Your message may have been saved.'
     if (error.kind === 'network') return 'The connection failed. Your message may have been saved.'
     if (error.kind === 'configuration') return 'Chat is unavailable. Check VITE_API_BASE_URL.'
@@ -73,8 +74,8 @@ export function createChatStore(sessionId: string, history: HistoryStore = creat
     busy = false
   }
 
-  const sync = async (token: number, initial: boolean) => {
-    await history.load()
+  const sync = async (token: number, initial: boolean, options: { waitForIdle?: boolean } = {}) => {
+    await history.load(options)
     if (generation !== token) return
     const loaded = history.getSnapshot()
     if (loaded.status !== 'success') {
@@ -109,7 +110,7 @@ export function createChatStore(sessionId: string, history: HistoryStore = creat
     publish({ ...loaded, messages: displayMessages(confirmed), syncError: null })
   }
 
-  const load = async () => {
+  const load = async (options: { waitForIdle?: boolean } = {}) => {
     if (busy) return
     busy = true
     const token = ++generation
@@ -117,7 +118,7 @@ export function createChatStore(sessionId: string, history: HistoryStore = creat
     if (initial) publish({ status: 'loading', error: null, messages: [], sending: false })
     else publish({ sending: false, reconciling: true })
     try {
-      await sync(token, initial)
+      await sync(token, initial, options)
     } finally {
       if (generation === token) {
         busy = false

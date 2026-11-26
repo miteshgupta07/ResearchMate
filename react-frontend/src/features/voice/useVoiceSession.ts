@@ -15,26 +15,9 @@ function stopMedia(room?: Room) {
   })
 }
 
-function wait(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const abort = () => { clearTimeout(timer); reject(new DOMException('Cancelled', 'AbortError')) }
-    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolve() }, ms)
-    if (signal.aborted) abort()
-    else signal.addEventListener('abort', abort, { once: true })
-  })
-}
-
-/** The backend has no flush acknowledgement. Re-read snapshots for a bounded grace period. */
-export async function refreshVoiceHistory(refresh: () => Promise<void>, signal: AbortSignal) {
-  for (const delay of [250, 750, 1500, 2500, 4000]) {
-    await wait(delay, signal)
-    if (signal.aborted) return
-    await refresh()
-  }
-}
-
 function connectionError(error: unknown): string {
   if (error instanceof ApiError) {
+    if (error.status === 409) return 'This conversation is busy. Wait for the current response or end the other voice connection, then try again.'
     if (error.status === 429) return 'Too many voice connection attempts. Wait a minute and try again.'
     if (error.status === 403) return 'Voice Mode is unavailable from this site.'
     if (error.status === 503) return 'Voice Mode is temporarily unavailable. Please try again later.'
@@ -42,7 +25,7 @@ function connectionError(error: unknown): string {
   return 'Could not connect to Voice Mode. Check your connection and try again.'
 }
 
-export function useVoiceSession(sessionId: string, refresh: () => Promise<void>) {
+export function useVoiceSession(sessionId: string, refresh: (options?: { waitForIdle?: boolean }) => Promise<void>) {
   const { voiceHistoryPending, setVoiceHistoryPending } = useSession()
   const [phase, setPhase] = useState<Phase>('idle')
   const [room, setRoom] = useState<Room | null>(null)
@@ -60,7 +43,7 @@ export function useVoiceSession(sessionId: string, refresh: () => Promise<void>)
       await Promise.resolve()
       if (controller.signal.aborted) return
       setPhase('syncing')
-      await refreshVoiceHistory(refresh, controller.signal)
+      await refresh({ waitForIdle: true })
       if (!controller.signal.aborted) {
         setVoiceHistoryPending(false)
         setPhase('idle')
