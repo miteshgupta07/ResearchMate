@@ -1,3 +1,6 @@
+from contextlib import nullcontext
+from types import SimpleNamespace
+from backend.core import deps
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
@@ -35,11 +38,13 @@ def client(monkeypatch):
     monkeypatch.setattr(voice, "_rate_total", 0)
     monkeypatch.setattr(voice, "_rate_clients", {})
     monkeypatch.setattr(voice, "monotonic", lambda: 1000.0)
+    app.dependency_overrides[deps.get_chat_history_store] = lambda: SimpleNamespace(session_lock=lambda *_: nullcontext(None))
     connection = TestClient(app, headers={"Origin": ORIGIN})
     try:
         yield connection
     finally:
         connection.close()
+        app.dependency_overrides.clear()
 
 
 def create_session(client, session_id=None, **kwargs):
@@ -193,6 +198,7 @@ def test_origin_guard_with_deployment_prefix(client):
         assert voice._rate_total == 0
     finally:
         connection.close()
+        app.dependency_overrides.clear()
 
 
 def test_voice_preflight_overrides_global_cors(client):

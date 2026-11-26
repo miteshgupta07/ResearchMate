@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import asyncio
 import json
 import threading
@@ -27,6 +28,7 @@ def store(tmp_path, monkeypatch):
     monkeypatch.setattr(PostgresChatHistoryStore, "_engine", engine)
     history = PostgresChatHistoryStore()
     monkeypatch.setattr(deps, "_chat_history_store", history)
+    monkeypatch.setattr(history, "session_lock", lambda *_args, **_kwargs: nullcontext(history))
     try:
         yield history
     finally:
@@ -321,7 +323,7 @@ def test_worker_startup_context_greeting_and_final_shutdown_messages(store, monk
 
 
 def test_invalid_metadata_closes_job_before_providers_start(monkeypatch):
-    ctx = SimpleNamespace(job=SimpleNamespace(metadata='{"session_id": "bad"}'), shutdown=Mock())
+    ctx = SimpleNamespace(job=SimpleNamespace(metadata='{"session_id": "bad"}'), shutdown=Mock(), add_shutdown_callback=Mock())
     providers = Mock()
     monkeypatch.setattr(agent, "setup_logging", lambda: None)
     monkeypatch.setattr(agent, "configure", lambda: None)
@@ -333,7 +335,7 @@ def test_invalid_metadata_closes_job_before_providers_start(monkeypatch):
 
 
 def test_database_load_failure_closes_job_before_providers_start(monkeypatch):
-    ctx = SimpleNamespace(job=SimpleNamespace(metadata=json.dumps({"session_id": str(uuid4())})), shutdown=Mock())
+    ctx = SimpleNamespace(job=SimpleNamespace(metadata=json.dumps({"session_id": str(uuid4())})), shutdown=Mock(), add_shutdown_callback=Mock())
     providers = Mock()
     monkeypatch.setattr(agent, "setup_logging", lambda: None)
     monkeypatch.setattr(agent, "configure", lambda: None)

@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -37,6 +38,7 @@ def history_store(tmp_path, monkeypatch):
     monkeypatch.setattr(PostgresChatHistoryStore, "_engine", engine)
     store = PostgresChatHistoryStore()
     monkeypatch.setattr(deps, "_chat_history_store", store)
+    monkeypatch.setattr(store, "session_lock", lambda *_args, **_kwargs: nullcontext(store))
     try:
         yield store
     finally:
