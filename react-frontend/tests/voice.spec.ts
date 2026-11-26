@@ -77,7 +77,8 @@ async function mockRoom(page: Page, options: { deny?: boolean; fail?: boolean; m
       }
       this.state = sdk.ConnectionState.Connecting
       if (flags.connectDelay) await new Promise((resolve) => setTimeout(resolve, flags.connectDelay))
-      if (this.state === sdk.ConnectionState.Disconnected) throw new Error('Cancelled during connect')
+      // disconnect() can mutate state while the simulated connection is awaiting.
+      if ((this.state as import('livekit-client').ConnectionState) === sdk.ConnectionState.Disconnected) throw new Error('Cancelled during connect')
       this.state = sdk.ConnectionState.Connected
       this.emit(sdk.RoomEvent.ConnectionStateChanged, sdk.ConnectionState.Connected)
       this.emit(sdk.RoomEvent.Connected)
@@ -177,7 +178,6 @@ test('orb follows SDK states, audio amplitude, interruption and mute', async ({ 
   const flowTransform = await page.locator('.voice-orb__flow').evaluate((node) => getComputedStyle(node).transform)
   await expect.poll(() => page.locator('.voice-orb__flow').evaluate((node) => getComputedStyle(node).transform)).not.toBe(flowTransform)
   await expect(page.locator('.opening-splash')).toHaveCount(0)
-  await page.screenshot({ path: 'node_modules/.cache/voice-orb-desktop.png' })
   await page.evaluate(() => Reflect.get(window, 'voiceTest').setAgentState('thinking'))
   await expect(orb).toHaveAttribute('data-state', 'thinking')
   await expect(page.getByRole('region', { name: 'Voice Mode' }).getByRole('status')).toHaveCount(0)
@@ -255,7 +255,6 @@ test('orb and controls fit a compact mobile chat workspace', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'End conversation', exact: true })).toBeInViewport()
   expect(await page.getByRole('region', { name: 'Chat messages' }).evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true)
   await expect(page.locator('.opening-splash')).toHaveCount(0)
-  await page.screenshot({ path: 'node_modules/.cache/voice-orb-mobile.png' })
 })
 
 test('composer switches between voice, text, Agent and PDF modes', async ({ page }) => {
