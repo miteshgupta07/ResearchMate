@@ -51,22 +51,6 @@ Python dependencies are pinned in [requirements.txt](requirements.txt). Frontend
 
 ## System Architecture
 
-```mermaid
-flowchart LR
-    react["React workspace"] -->|"HTTP: text, PDFs, history, voice token"| api["FastAPI"]
-    streamlit["Streamlit text interface"] -->|HTTP| api
-    api --> services["Chat / RAG / Agent / Portfolio"]
-    services --> groq["Groq"]
-    services --> arxiv["arXiv"]
-    services --> rag["PDFs / embeddings / FAISS"]
-    services --> db[(PostgreSQL)]
-    api -->|"Room-scoped token and agent dispatch configuration"| react
-    react <-->|"WebRTC audio"| livekit["LiveKit Cloud"]
-    livekit <-->|"Room audio"| worker["ResearchMate voice worker"]
-    worker --> providers["Silero / Deepgram / turn detector / Groq / Cartesia"]
-    worker -->|"Shared history and session locks"| db
-```
-
 FastAPI and the voice worker run as separate Python processes. PostgreSQL advisory locks serialize same-session interactions across them. The worker loads history before speaking and drains committed history writes during graceful shutdown. React then requests one history snapshot that waits for the session lock to become available.
 
 React accesses application services over HTTP and voice media through LiveKit. It does not import Python code, access PostgreSQL or FAISS directly, or hold provider API secrets. See [PROJECT_DEEP_DIVE.md](PROJECT_DEEP_DIVE.md) for lifecycle, persistence, API, and security details.
